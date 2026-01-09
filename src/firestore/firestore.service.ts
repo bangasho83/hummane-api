@@ -21,11 +21,13 @@ export class FirestoreService implements OnModuleInit {
                         parsedConfig = JSON.parse(serviceAccount);
                     }
 
+                    const envProjectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+
                     admin.initializeApp({
                         credential: admin.credential.cert(parsedConfig),
-                        projectId: parsedConfig.project_id, // Explicitly set projectId
+                        projectId: envProjectId || parsedConfig.project_id, // Prioritize env var
                     });
-                    console.log(`[FirestoreInfo] Firebase App initialized for project: ${parsedConfig.project_id}`);
+                    console.log(`[FirestoreInfo] Firebase App initialized for project: ${envProjectId || parsedConfig.project_id}`);
                 } catch (error) {
                     console.error('[FirestoreError] Failed to parse FIREBASE_SERVICE_ACCOUNT:', error);
                     admin.initializeApp();
