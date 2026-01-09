@@ -78,34 +78,49 @@ export class AuthService {
     }
 
     async login(firebaseToken: string) {
-        const decodedToken = await this.verifyFirebaseToken(firebaseToken);
-        const { email, uid, name, picture } = decodedToken;
+        try {
+            const decodedToken = await this.verifyFirebaseToken(firebaseToken);
+            const { email, uid, name, picture } = decodedToken;
 
-        if (!email) {
-            throw new UnauthorizedException('Email is required in Firebase token');
+            if (!email) {
+                throw new UnauthorizedException('Email is required in Firebase token');
+            }
+
+            console.log(`[AuthDebug] Looking for user with email: ${email}`);
+            // 1. Check if user exists in Hummane DB
+            let user = await this.usersService.findByEmail(email);
+            console.log(`[AuthDebug] User found: ${!!user}`);
+
+            // 2. If not, create user (Sync)
+            if (!user) {
+                console.log('[AuthDebug] Creating new user...');
+                user = await this.usersService.create({
+                    id: uuidv4(),
+                    email: email,
+                    name: name || 'Unknown User',
+                    createdAt: new Date().toISOString()
+                });
+                console.log('[AuthDebug] User created.');
+            }
+
+            // 3. Issue Hummane JWT
+            const payload: JwtPayload = {
+                sub: user.id,
+                email: user.email,
+                companyId: user.companyId
+            };
+
+            return {
+                access_token: this.jwtService.sign(payload),
+                user: user,
+            };
+        } catch (error) {
+            console.error('[AuthDebug] Login failed:', error);
+            if (error instanceof UnauthorizedException) {
+                throw error;
+            }
+            throw new Error(`Login failed: ${error.message}`);
         }
-
-        let user = await this.usersService.findByEmail(email);
-
-        if (!user) {
-            user = await this.usersService.create({
-                id: uuidv4(),
-                email: email,
-                name: name || 'Unknown User',
-                createdAt: new Date().toISOString()
-            });
-        }
-
-        const payload: JwtPayload = {
-            sub: user.id,
-            email: user.email,
-            companyId: user.companyId
-        };
-
-        return {
-            access_token: this.jwtService.sign(payload),
-            user: user,
-        };
     }
 
     async validateUser(payload: JwtPayload) {
