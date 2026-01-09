@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as admin from 'firebase-admin';
+import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { CompaniesService } from '../companies/companies.service';
 import { JwtPayload } from './auth.dto';
@@ -12,15 +13,47 @@ export class AuthService {
         private jwtService: JwtService,
         private usersService: UsersService,
         private companiesService: CompaniesService,
+        private configService: ConfigService,
     ) { }
 
+    private ensureFirebaseApp() {
+        if (!admin.apps.length) {
+            console.log('[AuthInfo] Firebase App not initialized. Initializing now...');
+            const serviceAccount = this.configService.get<string>('FIREBASE_SERVICE_ACCOUNT');
+            if (serviceAccount) {
+                try {
+                    // Handle quoted JSON string edge case from Vercel env vars
+                    let parsedConfig;
+                    if (serviceAccount.startsWith("'") && serviceAccount.endsWith("'")) {
+                        parsedConfig = JSON.parse(serviceAccount.slice(1, -1));
+                    } else {
+                        parsedConfig = JSON.parse(serviceAccount);
+                    }
+
+                    admin.initializeApp({
+                        credential: admin.credential.cert(parsedConfig),
+                    });
+                    console.log('[AuthInfo] Firebase App initialized with Service Account.');
+                } catch (error) {
+                    console.error('[AuthError] Failed to parse FIREBASE_SERVICE_ACCOUNT:', error);
+                    // Fallback to default (might fail if no ADC, but better than crashing here)
+                    admin.initializeApp();
+                }
+            } else {
+                console.log('[AuthInfo] No FIREBASE_SERVICE_ACCOUNT found. Initializing with default credentials.');
+                admin.initializeApp();
+            }
+        }
+    }
+
     async verifyFirebaseToken(token: string): Promise<admin.auth.DecodedIdToken> {
+        this.ensureFirebaseApp();
+
         try {
             // Log active app details to debug Vercel environment
             const app = admin.app();
-            console.log('[AuthDebug] Active Firebase App Name:', app.name);
-            console.log('[AuthDebug] Active Project ID from App Options:', app.options.projectId);
-            console.log('[AuthDebug] Service Account Email from Credential:', (app.options.credential as any)?.clientEmail);
+            // console.log('[AuthDebug] Active Firebase App Name:', app.name);
+            // console.log('[AuthDebug] Active Project ID from App Options:', app.options.projectId);
 
             return await admin.auth().verifyIdToken(token);
         } catch (error) {
@@ -44,9 +77,6 @@ export class AuthService {
 
         // 2. If not, create user (Sync)
         if (!user) {
-            // Check if there is a company invitation/pre-creation logic or just create a fresh user
-            // For MVP, if no user, we create one. If email matches a company domain owner logic could be here.
-            // Or we just create a user with no companyId yet.
             user = await this.usersService.create({
                 id: uuidv4(),
                 email: email,

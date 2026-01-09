@@ -5,7 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
 import { CompaniesModule } from '../companies/companies.module';
-import { AuthGuard } from './auth.guard'; // Renamed/Refactored guard
+import { AuthGuard } from './auth.guard';
 
 @Global()
 @Module({
@@ -16,7 +16,7 @@ import { AuthGuard } from './auth.guard'; // Renamed/Refactored guard
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
-                secret: configService.get<string>('JWT_SECRET') || 'fallbackSecretKey_CHANGE_IN_PROD', // Should be in env
+                secret: configService.get<string>('JWT_SECRET') || 'fallbackSecretKey_CHANGE_IN_PROD',
                 signOptions: { expiresIn: '1d' },
             }),
             inject: [ConfigService],
