@@ -14,6 +14,7 @@ import { LeaveRecordsModule } from './leaves/leave-records.module';
 import { HolidaysModule } from './holidays/holidays.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { DocumentsModule } from './documents/documents.module';
+import { DebugModule } from './debug/debug.module';
 
 @Module({
     imports: [
@@ -34,6 +35,7 @@ import { DocumentsModule } from './documents/documents.module';
         HolidaysModule,
         FeedbackModule,
         DocumentsModule,
+        DebugModule,
     ],
     controllers: [],
     providers: [],
