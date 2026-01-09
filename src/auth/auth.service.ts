@@ -61,7 +61,8 @@ export class AuthService {
             console.error('[AuthDebug] Token Verification Failed:', error);
             console.error('[AuthDebug] Error Code:', error.code);
             console.error('[AuthDebug] Error Message:', error.message);
-            throw new UnauthorizedException(`Invalid Firebase token: ${error.message}`);
+            const currentProjectId = admin.app().options.projectId;
+            throw new UnauthorizedException(`Invalid Firebase token. ProjectId: ${currentProjectId}. Error: ${error.message}`);
         }
     }
 
