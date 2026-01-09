@@ -1,8 +1,10 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import * as admin from 'firebase-admin';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
+    constructor(private jwtService: JwtService) { }
+
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest();
         const authHeader = request.headers.authorization;
@@ -13,13 +15,18 @@ export class AuthGuard implements CanActivate {
 
         const token = authHeader.split('Bearer ')[1];
         try {
-            const decodedToken = await admin.auth().verifyIdToken(token);
-            request.user = decodedToken;
-            // You might want to fetch additional user details from Firestore here 
-            // and attach them to the request object (e.g. companyId)
+            const payload = await this.jwtService.verifyAsync(token);
+
+            // Payload has { sub: userId, email, companyId }
+            request.user = {
+                id: payload.sub,
+                email: payload.email,
+                companyId: payload.companyId
+            };
+
             return true;
         } catch (error) {
-            throw new UnauthorizedException('Invalid token');
+            throw new UnauthorizedException('Invalid or expired token');
         }
     }
 }
