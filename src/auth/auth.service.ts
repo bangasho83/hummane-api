@@ -16,13 +16,27 @@ export class AuthService {
         private configService: ConfigService,
     ) { }
 
-    private ensureFirebaseApp() {
+    private async ensureFirebaseApp() {
+        // If app exists but has no project ID, it might be a bad init from another module.
+        if (admin.apps.length && !admin.app().options.projectId) {
+            console.log('[AuthInfo] Existing Firebase App missing Project ID. Deleting and re-initializing...');
+            try {
+                await admin.app().delete();
+            } catch (e) {
+                console.error('[AuthError] Failed to delete existing app:', e);
+            }
+        }
+
         if (!admin.apps.length) {
             console.log('[AuthInfo] Firebase App not initialized. Initializing now...');
             const serviceAccount = this.configService.get<string>('FIREBASE_SERVICE_ACCOUNT');
+            // Log if env vars are present (safe to log boolean existence)
+            console.log('[AuthInfo] Has Service Account:', !!serviceAccount);
+            const envProjectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+            console.log('[AuthInfo] Has Project ID Env:', !!envProjectId, envProjectId);
+
             if (serviceAccount) {
                 try {
-                    // Handle quoted JSON string edge case from Vercel env vars
                     let parsedConfig;
                     if (serviceAccount.startsWith("'") && serviceAccount.endsWith("'")) {
                         parsedConfig = JSON.parse(serviceAccount.slice(1, -1));
@@ -30,40 +44,35 @@ export class AuthService {
                         parsedConfig = JSON.parse(serviceAccount);
                     }
 
-                    const envProjectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+                    const finalProjectId = envProjectId || parsedConfig.project_id;
 
                     admin.initializeApp({
                         credential: admin.credential.cert(parsedConfig),
-                        projectId: envProjectId || parsedConfig.project_id, // Prioritize env var
+                        projectId: finalProjectId,
                     });
-                    console.log(`[AuthInfo] Firebase App initialized for project: ${envProjectId || parsedConfig.project_id}`);
+                    console.log(`[AuthInfo] Firebase App initialized for project: ${finalProjectId}`);
                 } catch (error) {
                     console.error('[AuthError] Failed to parse FIREBASE_SERVICE_ACCOUNT:', error);
-                    // Fallback to default (might fail if no ADC, but better than crashing here)
-                    admin.initializeApp();
+                    // Force re-init with just project ID if Service Account parse failed but we have project ID?
+                    // No, verifyIdToken NEEDS the private key.
+                    // Fallback to ADC
+                    admin.initializeApp({ projectId: envProjectId });
                 }
             } else {
-                console.log('[AuthInfo] No FIREBASE_SERVICE_ACCOUNT found. Initializing with default credentials.');
-                admin.initializeApp();
+                console.log('[AuthInfo] No FIREBASE_SERVICE_ACCOUNT found. Initializing with ADC/Env vars.');
+                admin.initializeApp({ projectId: envProjectId });
             }
         }
     }
 
     async verifyFirebaseToken(token: string): Promise<admin.auth.DecodedIdToken> {
-        this.ensureFirebaseApp();
+        await this.ensureFirebaseApp();
 
         try {
-            // Log active app details to debug Vercel environment
-            const app = admin.app();
-            // console.log('[AuthDebug] Active Firebase App Name:', app.name);
-            // console.log('[AuthDebug] Active Project ID from App Options:', app.options.projectId);
-
             return await admin.auth().verifyIdToken(token);
         } catch (error) {
             console.error('[AuthDebug] Token Verification Failed:', error);
-            console.error('[AuthDebug] Error Code:', error.code);
-            console.error('[AuthDebug] Error Message:', error.message);
-            const currentProjectId = admin.app().options.projectId;
+            const currentProjectId = admin.apps.length ? admin.app().options.projectId : 'NO_APP';
             throw new UnauthorizedException(`Invalid Firebase token. ProjectId: ${currentProjectId}. Error: ${error.message}`);
         }
     }
@@ -76,10 +85,8 @@ export class AuthService {
             throw new UnauthorizedException('Email is required in Firebase token');
         }
 
-        // 1. Check if user exists in Hummane DB
         let user = await this.usersService.findByEmail(email);
 
-        // 2. If not, create user (Sync)
         if (!user) {
             user = await this.usersService.create({
                 id: uuidv4(),
@@ -89,7 +96,6 @@ export class AuthService {
             });
         }
 
-        // 3. Issue Hummane JWT
         const payload: JwtPayload = {
             sub: user.id,
             email: user.email,
