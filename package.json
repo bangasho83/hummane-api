@@ -1,0 +1,47 @@
+{
+  "name": "hummane-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "ts-node src/main.ts",
+    "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "start:prod": "node dist/main",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bangasho83/hummane-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/bangasho83/hummane-api/issues"
+  },
+  "homepage": "https://github.com/bangasho83/hummane-api#readme",
+  "dependencies": {
+    "@google-cloud/firestore": "^8.1.0",
+    "@nestjs/common": "^11.1.11",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.11",
+    "@nestjs/platform-fastify": "^11.1.11",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "firebase-admin": "^13.6.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "uuid": "^9.0.1",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
