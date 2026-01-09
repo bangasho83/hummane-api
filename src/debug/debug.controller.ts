@@ -31,8 +31,25 @@ export class DebugController {
                 status: 'error',
                 message: error.message,
                 code: error.code,
-                projectId: admin.apps.length ? admin.app().options.projectId : 'none'
+                projectId: admin.apps.length ? admin.app().options.projectId : 'none',
+                env: {
+                    hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT,
+                    serviceAccountLength: process.env.FIREBASE_SERVICE_ACCOUNT ? process.env.FIREBASE_SERVICE_ACCOUNT.length : 0,
+                    hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+                    projectIdValue: process.env.FIREBASE_PROJECT_ID, // Safe to show project ID
+                    nodeEnv: process.env.NODE_ENV
+                }
             };
         }
+    }
+
+    @Get('env-check')
+    envCheck() {
+        return {
+            hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT,
+            serviceAccountLength: process.env.FIREBASE_SERVICE_ACCOUNT ? process.env.FIREBASE_SERVICE_ACCOUNT.length : 0,
+            hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+            projectIdValue: process.env.FIREBASE_PROJECT_ID,
+        };
     }
 }
