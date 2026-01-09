@@ -110,9 +110,17 @@ export class AuthService {
                 companyId: user.companyId
             };
 
+            // 4. Fetch Company Details
+            let company = null;
+            if (user.companyId) {
+                console.log(`[AuthDebug] Fetching company details for ID: ${user.companyId}`);
+                company = await this.companiesService.findOne(user.companyId);
+            }
+
             return {
                 access_token: this.jwtService.sign(payload),
                 user: user,
+                company: company,
             };
         } catch (error) {
             console.error('[AuthDebug] Login failed:', error);
