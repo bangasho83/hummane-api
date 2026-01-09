@@ -50,6 +50,37 @@ export class DebugController {
             serviceAccountLength: process.env.FIREBASE_SERVICE_ACCOUNT ? process.env.FIREBASE_SERVICE_ACCOUNT.length : 0,
             hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
             projectIdValue: process.env.FIREBASE_PROJECT_ID,
-        };
+    @Get('parse-check')
+        parseCheck() {
+            const sa = process.env.FIREBASE_SERVICE_ACCOUNT || '';
+            const results: any = {
+                rawLength: sa.length,
+                startsWithQuote: sa.startsWith("'"),
+                endsWithQuote: sa.endsWith("'"),
+                containsNewlines: sa.includes('\n'),
+                containsEscapedNewlines: sa.includes('\\n'),
+            };
+
+            try {
+                // 1. Try raw parse
+                JSON.parse(sa);
+                results.rawParse = 'Success';
+            } catch (e) {
+                results.rawParse = `Failed: ${e.message}`;
+            }
+
+            try {
+                // 2. Try unquoting
+                let unquoted = sa;
+                if (sa.startsWith("'") && sa.endsWith("'")) {
+                    unquoted = sa.slice(1, -1);
+                }
+                JSON.parse(unquoted);
+                results.unquotedParse = 'Success';
+            } catch (e) {
+                results.unquotedParse = `Failed: ${e.message}`;
+            }
+
+            return results;
+        }
     }
-}
