@@ -32,8 +32,9 @@ export class AuthService {
 
                     admin.initializeApp({
                         credential: admin.credential.cert(parsedConfig),
+                        projectId: parsedConfig.project_id, // Explicitly set projectId
                     });
-                    console.log('[AuthInfo] Firebase App initialized with Service Account.');
+                    console.log(`[AuthInfo] Firebase App initialized for project: ${parsedConfig.project_id}`);
                 } catch (error) {
                     console.error('[AuthError] Failed to parse FIREBASE_SERVICE_ACCOUNT:', error);
                     // Fallback to default (might fail if no ADC, but better than crashing here)
