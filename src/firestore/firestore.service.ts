@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class FirestoreService implements OnModuleInit {
-    private db: FirebaseFirestore.Firestore;
+    // Removed cached `db` property to prevent stale references if App is re-initialized
 
     constructor(private configService: ConfigService) { }
 
@@ -14,7 +14,7 @@ export class FirestoreService implements OnModuleInit {
             if (serviceAccount) {
                 try {
                     let parsedConfig;
-                    // Handle Vercel environment variable edge case (wrapped in single quotes)
+                    // Handle Vercel environment variable edge case
                     if (serviceAccount.startsWith("'") && serviceAccount.endsWith("'")) {
                         parsedConfig = JSON.parse(serviceAccount.slice(1, -1));
                     } else {
@@ -25,7 +25,7 @@ export class FirestoreService implements OnModuleInit {
 
                     admin.initializeApp({
                         credential: admin.credential.cert(parsedConfig),
-                        projectId: envProjectId || parsedConfig.project_id, // Prioritize env var
+                        projectId: envProjectId || parsedConfig.project_id,
                     });
                     console.log(`[FirestoreInfo] Firebase App initialized for project: ${envProjectId || parsedConfig.project_id}`);
                 } catch (error) {
@@ -37,10 +37,11 @@ export class FirestoreService implements OnModuleInit {
                 admin.initializeApp();
             }
         }
-        this.db = admin.firestore();
+        // Do NOT cache admin.firestore() here
     }
 
     getCollection(collectionName: string) {
-        return this.db.collection(collectionName);
+        // Always get the current Firestore instance attached to the active App
+        return admin.firestore().collection(collectionName);
     }
 }
