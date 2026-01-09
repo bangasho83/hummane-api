@@ -16,9 +16,18 @@ export class AuthService {
 
     async verifyFirebaseToken(token: string): Promise<admin.auth.DecodedIdToken> {
         try {
+            // Log active app details to debug Vercel environment
+            const app = admin.app();
+            console.log('[AuthDebug] Active Firebase App Name:', app.name);
+            console.log('[AuthDebug] Active Project ID from App Options:', app.options.projectId);
+            console.log('[AuthDebug] Service Account Email from Credential:', (app.options.credential as any)?.clientEmail);
+
             return await admin.auth().verifyIdToken(token);
         } catch (error) {
-            throw new UnauthorizedException('Invalid Firebase token');
+            console.error('[AuthDebug] Token Verification Failed:', error);
+            console.error('[AuthDebug] Error Code:', error.code);
+            console.error('[AuthDebug] Error Message:', error.message);
+            throw new UnauthorizedException(`Invalid Firebase token: ${error.message}`);
         }
     }
 
