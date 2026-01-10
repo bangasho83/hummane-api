@@ -16,7 +16,18 @@ export class CompaniesService {
             id,
             createdAt: new Date().toISOString(),
         };
+
+        // 1. Create the company
         await this.firestoreService.getCollection(this.collectionName).doc(id).set(newCompany);
+
+        // 2. Link the owner to this company if ownerId exists
+        if (newCompany.ownerId) {
+            console.log(`[CompaniesInfo] Linking owner ${newCompany.ownerId} to new company ${id}`);
+            await this.firestoreService.getCollection('users').doc(newCompany.ownerId).set({
+                companyId: id
+            }, { merge: true });
+        }
+
         return newCompany;
     }
 
@@ -43,5 +54,14 @@ export class CompaniesService {
 
     async delete(id: string): Promise<void> {
         await this.firestoreService.getCollection(this.collectionName).doc(id).delete();
+    }
+
+    async findByOwner(userId: string): Promise<Company | null> {
+        const snapshot = await this.firestoreService.getCollection(this.collectionName)
+            .where('ownerId', '==', userId)
+            .limit(1)
+            .get();
+        if (snapshot.empty) return null;
+        return snapshot.docs[0].data() as Company;
     }
 }

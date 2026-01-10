@@ -115,6 +115,16 @@ export class AuthService {
             if (user.companyId) {
                 console.log(`[AuthDebug] Fetching company details for ID: ${user.companyId}`);
                 company = await this.companiesService.findOne(user.companyId);
+            } else {
+                // Self-healing: Look for company owned by user if companyId is missing on profile
+                console.log(`[AuthDebug] User profile missing companyId. Searching for owned company for: ${user.id}`);
+                company = await this.companiesService.findByOwner(user.id);
+                if (company) {
+                    console.log(`[AuthDebug] Found owned company: ${company.id}. Updating user profile.`);
+                    // Update user profile in background to save this link
+                    await this.usersService.update(user.id, { companyId: company.id });
+                    user.companyId = company.id; // Update local object for JWT payload consistency if needed (though payload is already signed)
+                }
             }
 
             return {
