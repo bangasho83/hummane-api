@@ -1,6 +1,4 @@
-# ER Diagram (Mermaid)
-
-```mermaid
+%% ER Diagram
 erDiagram
     COMPANY ||--o{ USER : has
     USER ||--o{ COMPANY : owns
@@ -158,4 +156,3 @@ erDiagram
         timestamp createdAt
         timestamp updatedAt
     }
-```
