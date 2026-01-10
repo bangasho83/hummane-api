@@ -1,8 +1,18 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
+
+const TimestampSchema = z.instanceof(Timestamp);
+const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const IsoDateRangeSchema = z.union([
+    IsoDateSchema,
+    z.string().regex(/^\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$/),
+]);
 
 // Enums
 export const EmploymentTypeEnum = z.enum(['Contract', 'Full-time', 'Intern', 'Part-time']);
 export const GenderEnum = z.enum(['Male', 'Female', 'Non-binary', 'Prefer not to say']);
+export const JobStatusEnum = z.enum(['open', 'closed']);
+export const FeedbackEntryTypeEnum = z.enum(['interview', 'performance', 'onboarding', 'offboarding', 'general']);
 
 const DocumentItemSchema = z.object({
     name: z.string().min(1),
@@ -25,14 +35,14 @@ export const EmployeeSchema = z.object({
     email: z.string().email(),
     department: z.string().optional(),
     roleId: z.string().optional(),
-    startDate: z.string(), // ISO date
+    startDate: IsoDateSchema,
     employmentType: EmploymentTypeEnum,
     reportingManager: z.string().optional(),
     gender: GenderEnum,
     salary: z.number().optional(),
     documents: DocumentLinksSchema.optional(),
-    createdAt: z.string().optional(),
-    updatedAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export const DepartmentSchema = z.object({
@@ -40,7 +50,8 @@ export const DepartmentSchema = z.object({
     companyId: z.string().min(1),
     name: z.string().min(1),
     desc: z.string().optional(),
-    createdAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export const RoleSchema = z.object({
@@ -48,7 +59,8 @@ export const RoleSchema = z.object({
     companyId: z.string().min(1),
     title: z.string().min(1),
     description: z.string().optional(),
-    createdAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export const JobSchema = z.object({
@@ -61,9 +73,9 @@ export const JobSchema = z.object({
     location: z.string().optional(),
     salary: z.string().optional(), // Note: schema.json says salary is string/number? User brief says salary. Assuming string (range) or number. Brief says "salary". Let's assume string for range or formatted.
     experience: z.string().optional(),
-    status: z.enum(['open', 'closed']),
-    createdAt: z.string().optional(),
-    updatedAt: z.string().optional(),
+    status: JobStatusEnum,
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export type Employee = z.infer<typeof EmployeeSchema>;
@@ -90,10 +102,10 @@ export const ApplicantSchema = z.object({
     resumeFile: z.string().optional(), // URL
     linkedinUrl: z.string().optional(),
     status: ApplicantStatusEnum,
-    appliedDate: z.string(),
+    appliedDate: IsoDateSchema,
     documents: DocumentFilesSchema.optional(),
-    createdAt: z.string().optional(),
-    updatedAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export const LeaveTypeSchema = z.object({
@@ -104,30 +116,31 @@ export const LeaveTypeSchema = z.object({
     unit: LeaveUnitEnum,
     quota: z.number(),
     employmentType: EmploymentTypeEnum.optional(), // Can apply to specific types
-    createdAt: z.string().optional(),
-    updatedAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export const LeaveRecordSchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
     employeeId: z.string().min(1),
-    date: z.string(), // or range
-    type: z.string(), // leave type name or ID? Schema says type.
+    date: IsoDateRangeSchema,
     leaveTypeId: z.string().optional(),
     unit: LeaveUnitEnum.optional(),
     amount: z.number().optional(),
     note: z.string().optional(),
     documents: DocumentFilesSchema.optional(),
-    createdAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export const HolidaySchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
-    date: z.string(),
+    date: IsoDateSchema,
     name: z.string().min(1),
-    createdAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export type Applicant = z.infer<typeof ApplicantSchema>;
@@ -145,22 +158,34 @@ export const FeedbackCardSchema = z.object({
     title: z.string().min(1),
     subject: FeedbackSubjectEnum,
     questions: z.array(z.any()), // flexible schema for questions
-    createdAt: z.string().optional(),
-    updatedAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
+
+const FeedbackEntrySubjectSchema = z.discriminatedUnion('kind', [
+    z.object({
+        kind: z.literal('Employee'),
+        id: z.string().min(1),
+        name: z.string().optional(),
+    }),
+    z.object({
+        kind: z.literal('Applicant'),
+        id: z.string().min(1),
+        name: z.string().optional(),
+    }),
+]);
 
 export const FeedbackEntrySchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
-    type: z.string().optional(), // e.g. 'interview', 'performance'
+    type: FeedbackEntryTypeEnum.optional(),
     cardId: z.string().min(1),
-    subjectId: z.string().optional(),
-    subjectName: z.string().optional(),
+    subject: FeedbackEntrySubjectSchema,
     authorId: z.string().optional(),
     authorName: z.string().optional(),
     answers: z.array(z.any()),
-    createdAt: z.string().optional(),
-    updatedAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export const EmployeeDocumentSchema = z.object({
@@ -170,7 +195,7 @@ export const EmployeeDocumentSchema = z.object({
     name: z.string().min(1),
     type: DocumentKindEnum,
     dataUrl: z.string().optional(), // Store URL or base64 (better URL)
-    uploadedAt: z.string().optional(),
+    uploadedAt: TimestampSchema.optional(),
 });
 
 export type FeedbackCard = z.infer<typeof FeedbackCardSchema>;

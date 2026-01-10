@@ -1,4 +1,5 @@
 import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { EmployeeDocument, EmployeeDocumentSchema } from '../schemas/hr.schema';
@@ -10,7 +11,7 @@ export class DocumentsService {
 
     async create(data: EmployeeDocument) {
         const id = data.id || uuidv4();
-        const doc = { ...data, id, uploadedAt: new Date().toISOString() };
+        const doc = { ...data, id, uploadedAt: Timestamp.now() };
         await this.firestore.getCollection('documents').doc(id).set(doc);
         return doc;
     }

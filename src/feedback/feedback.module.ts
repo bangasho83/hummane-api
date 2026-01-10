@@ -1,4 +1,5 @@
 import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { FeedbackCard, FeedbackCardSchema, FeedbackEntry, FeedbackEntrySchema } from '../schemas/hr.schema';
@@ -10,7 +11,7 @@ export class FeedbackCardsService {
     constructor(private firestore: FirestoreService) { }
     async create(data: FeedbackCard) {
         const id = data.id || uuidv4();
-        const doc = { ...data, id, createdAt: new Date().toISOString() };
+        const doc = { ...data, id, createdAt: Timestamp.now() };
         await this.firestore.getCollection('feedbackCards').doc(id).set(doc);
         return doc;
     }
@@ -34,7 +35,7 @@ export class FeedbackCardsService {
         const currentData = doc.data() as FeedbackCard;
         if (currentData.companyId !== companyId) return null;
 
-        await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
         return this.findOne(id, companyId);
     }
     async delete(id: string, companyId: string) {
@@ -54,7 +55,7 @@ export class FeedbackEntriesService {
     constructor(private firestore: FirestoreService) { }
     async create(data: FeedbackEntry) {
         const id = data.id || uuidv4();
-        const doc = { ...data, id, createdAt: new Date().toISOString() };
+        const doc = { ...data, id, createdAt: Timestamp.now() };
         await this.firestore.getCollection('feedbackEntries').doc(id).set(doc);
         return doc;
     }
@@ -78,7 +79,7 @@ export class FeedbackEntriesService {
         const currentData = doc.data() as FeedbackEntry;
         if (currentData.companyId !== companyId) return null;
 
-        await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
         return this.findOne(id, companyId);
     }
     async delete(id: string, companyId: string) {

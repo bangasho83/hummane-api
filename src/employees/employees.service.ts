@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { Employee } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,7 +15,7 @@ export class EmployeesService {
         const newDoc = {
             ...data,
             id,
-            createdAt: new Date().toISOString(),
+            createdAt: Timestamp.now(),
         };
         await this.firestoreService.getCollection(this.collectionName).doc(id).set(newDoc);
         return newDoc;
@@ -46,7 +47,7 @@ export class EmployeesService {
         const currentData = doc.data() as Employee;
         if (currentData.companyId !== companyId) return null; // Enforce isolation
 
-        const updated = { ...currentData, ...updateData, updatedAt: new Date().toISOString() };
+        const updated = { ...currentData, ...updateData, updatedAt: Timestamp.now() };
         await docRef.set(updated, { merge: true });
         return updated as Employee;
     }

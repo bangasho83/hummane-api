@@ -225,7 +225,7 @@ curl -X DELETE "$BASE_URL/leave-types/YOUR_LEAVE_TYPE_ID" \
 curl -X POST "$BASE_URL/leaves" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"employeeId":"EMP-001","date":"2024-01-10","type":"Annual Leave","unit":"Day","amount":1,"note":"Family event","documents":{"files":["https://example.com/leave-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"employeeId":"EMP-001","leaveTypeId":"YOUR_LEAVE_TYPE_ID","date":"2024-01-10","unit":"Day","amount":1,"note":"Family event","documents":{"files":["https://example.com/leave-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /leaves
 curl -X GET "$BASE_URL/leaves" \
@@ -300,7 +300,7 @@ curl -X DELETE "$BASE_URL/feedback-cards/YOUR_CARD_ID" \
 curl -X POST "$BASE_URL/feedback-entries" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"cardId":"YOUR_CARD_ID","subjectId":"YOUR_SUBJECT_ID","subjectName":"Jane Doe","answers":[{"questionId":"q1","answer":"Great"}],"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"cardId":"YOUR_CARD_ID","type":"performance","subject":{"kind":"Employee","id":"YOUR_EMPLOYEE_ID","name":"Jane Doe"},"answers":[{"questionId":"q1","answer":"Great"}],"companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /feedback-entries
 curl -X GET "$BASE_URL/feedback-entries" \

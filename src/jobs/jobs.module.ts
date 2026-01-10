@@ -1,4 +1,5 @@
 import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { Job, JobSchema } from '../schemas/hr.schema';
@@ -10,7 +11,7 @@ export class JobsService {
 
     async create(data: Job) {
         const id = data.id || uuidv4();
-        const doc = { ...data, id, createdAt: new Date().toISOString() };
+        const doc = { ...data, id, createdAt: Timestamp.now() };
         await this.firestore.getCollection('jobs').doc(id).set(doc);
         return doc;
     }
@@ -37,7 +38,7 @@ export class JobsService {
         const currentData = doc.data() as Job;
         if (currentData.companyId !== companyId) return null;
 
-        await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
         return (await ref.get()).data();
     }
 

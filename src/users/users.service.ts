@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { User, UserSchema } from '../schemas/core.schema';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,7 +15,7 @@ export class UsersService {
         const newUser = {
             ...userData,
             id,
-            createdAt: new Date().toISOString(),
+            createdAt: Timestamp.now(),
         };
 
         await this.firestoreService.getCollection(this.collectionName).doc(id).set(newUser);
@@ -47,7 +48,7 @@ export class UsersService {
         const doc = await docRef.get();
         if (!doc.exists) return null;
 
-        const updatedUser = { ...doc.data(), ...updateData, updatedAt: new Date().toISOString() };
+        const updatedUser = { ...doc.data(), ...updateData, updatedAt: Timestamp.now() };
         await docRef.set(updatedUser, { merge: true });
         return updatedUser as User;
     }

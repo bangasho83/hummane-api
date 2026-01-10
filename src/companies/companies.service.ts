@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { Company, CompanySchema } from '../schemas/core.schema';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,7 +15,7 @@ export class CompaniesService {
         const newCompany = {
             ...companyData,
             id,
-            createdAt: new Date().toISOString(),
+            createdAt: Timestamp.now(),
         };
 
         // 1. Create the company
@@ -47,7 +48,7 @@ export class CompaniesService {
         const doc = await docRef.get();
         if (!doc.exists) return null;
 
-        const updatedCompany = { ...doc.data(), ...updateData, updatedAt: new Date().toISOString() }; // updatedAt not in schema but good to have
+        const updatedCompany = { ...doc.data(), ...updateData, updatedAt: Timestamp.now() };
         await docRef.set(updatedCompany, { merge: true });
         return updatedCompany as Company;
     }

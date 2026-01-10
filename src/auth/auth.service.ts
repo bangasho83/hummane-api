@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as admin from 'firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { CompaniesService } from '../companies/companies.service';
@@ -94,7 +95,7 @@ export class AuthService {
                     id: uuidv4(),
                     email: email,
                     name: name || 'Unknown User',
-                    createdAt: new Date().toISOString()
+                    createdAt: Timestamp.now()
                 });
             }
 

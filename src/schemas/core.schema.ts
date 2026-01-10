@@ -1,4 +1,7 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
+
+const TimestampSchema = z.instanceof(Timestamp);
 
 export const UserSchema = z.object({
     id: z.string().optional(), // generated on server
@@ -6,7 +9,8 @@ export const UserSchema = z.object({
     email: z.string().email(),
     password: z.string().optional(), // hashed, might not be needed if using Firebase Auth strictly, but kept for legacy
     companyId: z.string().optional(),
-    createdAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 const WorkDaySchema = z.object({
@@ -34,7 +38,8 @@ export const CompanySchema = z.object({
     timezone: z.string().optional(),
     workingHours: WorkingHoursSchema.optional(),
     ownerId: z.string(),
-    createdAt: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export type User = z.infer<typeof UserSchema>;

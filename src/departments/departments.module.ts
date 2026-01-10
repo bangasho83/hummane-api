@@ -1,4 +1,5 @@
 import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { Department, DepartmentSchema } from '../schemas/hr.schema';
@@ -16,7 +17,7 @@ export class DepartmentsService {
         }
 
         const id = data.id || uuidv4();
-        const doc = { ...data, id, createdAt: new Date().toISOString() };
+        const doc = { ...data, id, createdAt: Timestamp.now() };
         console.log(`[DepartmentsService] [SAVE_TRACE] Final Document:`, JSON.stringify(doc));
 
         await this.firestore.getCollection('departments').doc(id).set(doc);
@@ -45,7 +46,7 @@ export class DepartmentsService {
         const currentData = doc.data() as Department;
         if (currentData.companyId !== companyId) return null;
 
-        await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
         const updated = await ref.get();
         return updated.data();
     }
