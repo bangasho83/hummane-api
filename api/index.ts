@@ -14,14 +14,15 @@ export default async function handler(req: any, res: any) {
             origin: true,
             methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
             credentials: true,
+            allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With',
         });
         await app.init();
     }
 
-    // Fastify needs to be ready before handling requests
     const instance = app.getHttpAdapter().getInstance();
-    await instance.ready();
 
-    // Forward the request to Fastify's internal Node server
+    // Handle OPTIONS manually if needed, but instance.ready() + emit should work 
+    // if Nest CORS is configured.
+    await instance.ready();
     instance.server.emit('request', req, res);
 }

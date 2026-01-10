@@ -12,6 +12,7 @@ async function bootstrap() {
         origin: true,
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
         credentials: true,
+        allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With',
     });
 
     const port = process.env.PORT || 3000;
