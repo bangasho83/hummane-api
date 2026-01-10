@@ -1,6 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { FirestoreService } from '../firestore/firestore.service';
+import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('debug')
 export class DebugController {
@@ -23,8 +24,11 @@ export class DebugController {
                 status: 'success',
                 projectId,
                 userCount: users.length,
-                users: users, // Return actual data to verify it's the right DB
-                firebaseAppCount: admin.apps.length
+                firebaseAppCount: admin.apps.length,
+                env: {
+                    hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT,
+                    hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+                }
             };
         } catch (error) {
             return {
@@ -85,5 +89,13 @@ export class DebugController {
         }
 
         return results;
+    }
+    @Get('auth-session')
+    @UseGuards(AuthGuard)
+    authSession(@Req() req) {
+        return {
+            message: 'Authentication session is active',
+            user: req.user
+        };
     }
 }

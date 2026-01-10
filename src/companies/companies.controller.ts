@@ -11,15 +11,17 @@ export class CompaniesController {
     @Post()
     async create(@Body() companyData: Company, @Req() req) {
         const user = req.user;
-        // Force ownerId to be the authenticated user if not provided or to ensure correctness
-        if (user && user.uid) {
-            companyData.ownerId = user.uid;
+        // Force ownerId to be the authenticated user
+        if (user && user.id) {
+            companyData.ownerId = user.id;
         }
 
         const result = CompanySchema.safeParse(companyData);
         if (!result.success) {
             throw new Error('Validation failed: ' + JSON.stringify(result.error.issues));
         }
+
+        console.log(`[CompaniesController] Creating company for owner: ${user.id}`);
         return this.companiesService.create(result.data as Company);
     }
 
