@@ -10,7 +10,6 @@ export const EmployeeSchema = z.object({
     companyId: z.string().min(1),
     name: z.string().min(1),
     email: z.string().email(),
-    position: z.string().min(1),
     department: z.string().optional(),
     roleId: z.string().optional(),
     startDate: z.string(), // ISO date

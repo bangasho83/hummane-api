@@ -9,12 +9,30 @@ export const UserSchema = z.object({
     createdAt: z.string().optional(),
 });
 
+const WorkDaySchema = z.object({
+    open: z.boolean(),
+    start: z.string().optional(),
+    end: z.string().optional(),
+});
+
+const WorkingHoursSchema = z.object({
+    monday: WorkDaySchema,
+    tuesday: WorkDaySchema,
+    wednesday: WorkDaySchema,
+    thursday: WorkDaySchema,
+    friday: WorkDaySchema,
+    saturday: WorkDaySchema,
+    sunday: WorkDaySchema,
+});
+
 export const CompanySchema = z.object({
     id: z.string().optional(),
     name: z.string().min(1),
     industry: z.string().optional(),
     size: z.string().optional(),
     currency: z.string().optional(),
+    timezone: z.string().optional(),
+    workingHours: WorkingHoursSchema.optional(),
     ownerId: z.string(),
     createdAt: z.string().optional(),
 });

@@ -50,7 +50,7 @@ curl -X DELETE "$BASE_URL/users/YOUR_USER_ID" \
 curl -X POST "$BASE_URL/companies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Acme Inc","industry":"Software","size":"11-50","currency":"USD","timezone":"America/New_York"}'
+  -d '{"name":"Acme Inc","industry":"Software","size":"11-50","currency":"USD","timezone":"America/New_York","workingHours":{"monday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"tuesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"wednesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"thursday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"friday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"saturday":{"open":false,"start":"09:00 AM","end":"05:00 PM"},"sunday":{"open":false,"start":"09:00 AM","end":"05:00 PM"}}}'
 
 ### GET /companies
 curl -X GET "$BASE_URL/companies" \
@@ -64,7 +64,7 @@ curl -X GET "$BASE_URL/companies/YOUR_COMPANY_ID" \
 curl -X PUT "$BASE_URL/companies/YOUR_COMPANY_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"industry":"Fintech","currency":"USD","timezone":"America/Los_Angeles"}'
+  -d '{"industry":"Fintech","currency":"USD","timezone":"America/Los_Angeles","workingHours":{"monday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"tuesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"wednesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"thursday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"friday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"saturday":{"open":false,"start":"09:00 AM","end":"05:00 PM"},"sunday":{"open":false,"start":"09:00 AM","end":"05:00 PM"}}}'
 
 ### DELETE /companies/:id
 curl -X DELETE "$BASE_URL/companies/YOUR_COMPANY_ID" \
@@ -75,7 +75,7 @@ curl -X DELETE "$BASE_URL/companies/YOUR_COMPANY_ID" \
 curl -X POST "$BASE_URL/employees" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"employeeId":"EMP-001","companyId":"YOUR_COMPANY_ID","name":"Jane Doe","email":"jane@example.com","position":"Engineer","startDate":"2024-01-01","employmentType":"Full-time","gender":"Female"}'
+  -d '{"employeeId":"EMP-001","companyId":"YOUR_COMPANY_ID","name":"Jane Doe","email":"jane@example.com","startDate":"2024-01-01","employmentType":"Full-time","gender":"Female"}'
 
 ### GET /employees
 curl -X GET "$BASE_URL/employees" \
@@ -89,7 +89,7 @@ curl -X GET "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
 curl -X PUT "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"position":"Senior Engineer","companyId":"YOUR_COMPANY_ID"}'
+  -d '{"companyId":"YOUR_COMPANY_ID"}'
 
 ### DELETE /employees/:id
 curl -X DELETE "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
