@@ -50,7 +50,7 @@ curl -X DELETE "$BASE_URL/users/YOUR_USER_ID" \
 curl -X POST "$BASE_URL/companies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Acme Inc","industry":"Software","size":"11-50","currency":"USD"}'
+  -d '{"name":"Acme Inc","industry":"Software","size":"11-50","currency":"USD","timezone":"America/New_York"}'
 
 ### GET /companies
 curl -X GET "$BASE_URL/companies" \
@@ -64,7 +64,7 @@ curl -X GET "$BASE_URL/companies/YOUR_COMPANY_ID" \
 curl -X PUT "$BASE_URL/companies/YOUR_COMPANY_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"industry":"Fintech"}'
+  -d '{"industry":"Fintech","currency":"USD","timezone":"America/Los_Angeles"}'
 
 ### DELETE /companies/:id
 curl -X DELETE "$BASE_URL/companies/YOUR_COMPANY_ID" \
