@@ -75,7 +75,7 @@ curl -X DELETE "$BASE_URL/companies/YOUR_COMPANY_ID" \
 curl -X POST "$BASE_URL/employees" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"employeeId":"EMP-001","companyId":"YOUR_COMPANY_ID","name":"Jane Doe","email":"jane@example.com","startDate":"2024-01-01","employmentType":"Full-time","gender":"Female","documents":{"links":["https://example.com/jane-resume.pdf","https://example.com/jane-cover-letter.docx"]}}'
+  -d '{"employeeId":"EMP-001","companyId":"YOUR_COMPANY_ID","name":"Jane Doe","email":"jane@example.com","startDate":"2024-01-01","employmentType":"Full-time","gender":"Female","documents":{"files":[{"name":"Passport","url":"https://example.com/jane-passport.pdf"},{"name":"Resume","url":"https://example.com/jane-resume.pdf"}]}}'
 
 ### GET /employees
 curl -X GET "$BASE_URL/employees" \
@@ -89,7 +89,7 @@ curl -X GET "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
 curl -X PUT "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"companyId":"YOUR_COMPANY_ID","documents":{"links":["https://example.com/jane-resume.pdf"]}}'
+  -d '{"companyId":"YOUR_COMPANY_ID","documents":{"files":[{"name":"Resume","url":"https://example.com/jane-resume.pdf"}]}}'
 
 ### DELETE /employees/:id
 curl -X DELETE "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
@@ -175,7 +175,7 @@ curl -X DELETE "$BASE_URL/jobs/YOUR_JOB_ID" \
 curl -X POST "$BASE_URL/applicants" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"fullName":"Sam Applicant","email":"sam@example.com","status":"new","appliedDate":"2024-01-02","companyId":"YOUR_COMPANY_ID","documents":{"links":["https://example.com/sam-resume.pdf","https://example.com/sam-cover-letter.docx"]}}'
+  -d '{"fullName":"Sam Applicant","email":"sam@example.com","status":"new","appliedDate":"2024-01-02","companyId":"YOUR_COMPANY_ID","documents":{"files":["https://example.com/sam-resume.pdf","https://example.com/sam-cover-letter.docx"]}}'
 
 ### GET /applicants
 curl -X GET "$BASE_URL/applicants" \
@@ -189,7 +189,7 @@ curl -X GET "$BASE_URL/applicants/YOUR_APPLICANT_ID" \
 curl -X PUT "$BASE_URL/applicants/YOUR_APPLICANT_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"status":"interview","companyId":"YOUR_COMPANY_ID","documents":{"links":["https://example.com/sam-resume.pdf"]}}'
+  -d '{"status":"interview","companyId":"YOUR_COMPANY_ID","documents":{"files":["https://example.com/sam-resume.pdf"]}}'
 
 ### DELETE /applicants/:id
 curl -X DELETE "$BASE_URL/applicants/YOUR_APPLICANT_ID" \
@@ -225,7 +225,7 @@ curl -X DELETE "$BASE_URL/leave-types/YOUR_LEAVE_TYPE_ID" \
 curl -X POST "$BASE_URL/leaves" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"employeeId":"EMP-001","date":"2024-01-10","type":"Annual Leave","unit":"Day","amount":1,"note":"Family event","attachments":["https://example.com/leave-request.pdf"],"documents":{"links":["https://example.com/leave-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"employeeId":"EMP-001","date":"2024-01-10","type":"Annual Leave","unit":"Day","amount":1,"note":"Family event","documents":{"files":["https://example.com/leave-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /leaves
 curl -X GET "$BASE_URL/leaves" \
@@ -239,7 +239,7 @@ curl -X GET "$BASE_URL/leaves/YOUR_LEAVE_ID" \
 curl -X PUT "$BASE_URL/leaves/YOUR_LEAVE_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"note":"Updated note","attachments":["https://example.com/updated-request.pdf"],"documents":{"links":["https://example.com/updated-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"note":"Updated note","documents":{"files":["https://example.com/updated-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
 
 ### DELETE /leaves/:id
 curl -X DELETE "$BASE_URL/leaves/YOUR_LEAVE_ID" \

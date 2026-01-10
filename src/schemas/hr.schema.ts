@@ -4,8 +4,17 @@ import { z } from 'zod';
 export const EmploymentTypeEnum = z.enum(['Contract', 'Full-time', 'Intern', 'Part-time']);
 export const GenderEnum = z.enum(['Male', 'Female', 'Non-binary', 'Prefer not to say']);
 
+const DocumentItemSchema = z.object({
+    name: z.string().min(1),
+    url: z.string().min(1),
+});
+
 const DocumentLinksSchema = z.object({
-    links: z.array(z.string()),
+    files: z.array(DocumentItemSchema),
+});
+
+const DocumentFilesSchema = z.object({
+    files: z.array(z.string()),
 });
 
 export const EmployeeSchema = z.object({
@@ -82,7 +91,7 @@ export const ApplicantSchema = z.object({
     linkedinUrl: z.string().optional(),
     status: ApplicantStatusEnum,
     appliedDate: z.string(),
-    documents: DocumentLinksSchema.optional(),
+    documents: DocumentFilesSchema.optional(),
     createdAt: z.string().optional(),
     updatedAt: z.string().optional(),
 });
@@ -109,8 +118,7 @@ export const LeaveRecordSchema = z.object({
     unit: LeaveUnitEnum.optional(),
     amount: z.number().optional(),
     note: z.string().optional(),
-    attachments: z.array(z.string()).optional(),
-    documents: DocumentLinksSchema.optional(),
+    documents: DocumentFilesSchema.optional(),
     createdAt: z.string().optional(),
 });
 
