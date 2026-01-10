@@ -20,32 +20,46 @@ export class EmployeesService {
         return newDoc;
     }
 
-    async findAll(companyId?: string): Promise<Employee[]> {
-        let query: FirebaseFirestore.Query = this.firestoreService.getCollection(this.collectionName);
-        if (companyId) {
-            query = query.where('companyId', '==', companyId);
-        }
-        const snapshot = await query.get();
+    async findAll(companyId: string): Promise<Employee[]> {
+        // Strict filtering by companyId
+        const snapshot = await this.firestoreService.getCollection(this.collectionName)
+            .where('companyId', '==', companyId)
+            .get();
         return snapshot.docs.map(doc => doc.data() as Employee);
     }
 
-    async findOne(id: string): Promise<Employee | null> {
+    async findOne(id: string, companyId: string): Promise<Employee | null> {
         const doc = await this.firestoreService.getCollection(this.collectionName).doc(id).get();
         if (!doc.exists) return null;
-        return doc.data() as Employee;
+
+        const data = doc.data() as Employee;
+        if (data.companyId !== companyId) return null; // Enforce isolation
+
+        return data;
     }
 
-    async update(id: string, updateData: Partial<Employee>): Promise<Employee | null> {
+    async update(id: string, updateData: Partial<Employee>, companyId: string): Promise<Employee | null> {
         const docRef = this.firestoreService.getCollection(this.collectionName).doc(id);
         const doc = await docRef.get();
         if (!doc.exists) return null;
 
-        const updated = { ...doc.data(), ...updateData, updatedAt: new Date().toISOString() };
+        const currentData = doc.data() as Employee;
+        if (currentData.companyId !== companyId) return null; // Enforce isolation
+
+        const updated = { ...currentData, ...updateData, updatedAt: new Date().toISOString() };
         await docRef.set(updated, { merge: true });
         return updated as Employee;
     }
 
-    async delete(id: string): Promise<void> {
-        await this.firestoreService.getCollection(this.collectionName).doc(id).delete();
+    async delete(id: string, companyId: string): Promise<void> {
+        const docRef = this.firestoreService.getCollection(this.collectionName).doc(id);
+        const doc = await docRef.get();
+
+        if (doc.exists) {
+            const data = doc.data() as Employee;
+            if (data.companyId === companyId) {
+                await docRef.delete();
+            }
+        }
     }
 }

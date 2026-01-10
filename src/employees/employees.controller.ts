@@ -9,7 +9,13 @@ export class EmployeesController {
     constructor(private readonly employeesService: EmployeesService) { }
 
     @Post()
-    async create(@Body() data: Employee) {
+    async create(@Body() data: Employee, @Req() req) {
+        const user = req.user;
+        if (!user.companyId) throw new Error('User does not belong to a company'); // Should be caught by AuthGuard ideally or handled
+
+        // Force companyId from token
+        data.companyId = user.companyId;
+
         const result = EmployeeSchema.safeParse(data);
         if (!result.success) {
             throw new Error('Validation failed: ' + JSON.stringify(result.error.issues));
@@ -18,23 +24,30 @@ export class EmployeesController {
     }
 
     @Get()
-    async findAll(@Query('companyId') companyId: string) {
-        // In real app, extract companyId from auth token to enforce isolation
-        return this.employeesService.findAll(companyId);
+    async findAll(@Req() req) {
+        const user = req.user;
+        if (!user.companyId) return []; // Or throw error
+        return this.employeesService.findAll(user.companyId);
     }
 
     @Get(':id')
-    async findOne(@Param('id') id: string) {
-        return this.employeesService.findOne(id);
+    async findOne(@Param('id') id: string, @Req() req) {
+        const user = req.user;
+        if (!user.companyId) return null;
+        return this.employeesService.findOne(id, user.companyId);
     }
 
     @Put(':id')
-    async update(@Param('id') id: string, @Body() data: Partial<Employee>) {
-        return this.employeesService.update(id, data);
+    async update(@Param('id') id: string, @Body() data: Partial<Employee>, @Req() req) {
+        const user = req.user;
+        if (!user.companyId) throw new Error('User does not belong to a company');
+        return this.employeesService.update(id, data, user.companyId);
     }
 
     @Delete(':id')
-    async remove(@Param('id') id: string) {
-        return this.employeesService.delete(id);
+    async remove(@Param('id') id: string, @Req() req) {
+        const user = req.user;
+        if (!user.companyId) throw new Error('User does not belong to a company');
+        return this.employeesService.delete(id, user.companyId);
     }
 }
