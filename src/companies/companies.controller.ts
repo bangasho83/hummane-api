@@ -30,7 +30,7 @@ export class CompaniesController {
         const user = req.user;
         if (!user.companyId) {
             // If they don't have a company link, maybe they own one?
-            const owned = await this.companiesService.findByOwner(user.uid);
+            const owned = await this.companiesService.findByOwner(user.id);
             return owned ? [owned] : [];
         }
         const company = await this.companiesService.findOne(user.companyId);
@@ -43,7 +43,7 @@ export class CompaniesController {
         if (user.companyId && id !== user.companyId) {
             // Check if they are owner
             const company = await this.companiesService.findOne(id);
-            if (company?.ownerId !== user.uid) {
+            if (company?.ownerId !== user.id) {
                 return null; // or throw Forbidden
             }
             return company;
@@ -58,7 +58,7 @@ export class CompaniesController {
         if (!company) return null;
 
         // Only owner or someone in the company can update (though usually only owner)
-        if (company.ownerId !== user.uid && id !== user.companyId) {
+        if (company.ownerId !== user.id && id !== user.companyId) {
             throw new Error('Forbidden');
         }
 
@@ -71,7 +71,7 @@ export class CompaniesController {
         const company = await this.companiesService.findOne(id);
         if (!company) return;
 
-        if (company.ownerId !== user.uid) {
+        if (company.ownerId !== user.id) {
             throw new Error('Forbidden');
         }
 
