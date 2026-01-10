@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query } from '@nestjs/common';
+import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { EmployeeDocument, EmployeeDocumentSchema } from '../schemas/hr.schema';
@@ -15,20 +15,31 @@ export class DocumentsService {
         return doc;
     }
 
-    async findAll(employeeId?: string) {
-        let query: FirebaseFirestore.Query = this.firestore.getCollection('documents');
+    async findAll(companyId: string, employeeId?: string) {
+        let query: FirebaseFirestore.Query = this.firestore.getCollection('documents')
+            .where('companyId', '==', companyId);
         if (employeeId) query = query.where('employeeId', '==', employeeId);
         const snap = await query.get();
         return snap.docs.map(d => d.data());
     }
 
-    async findOne(id: string) {
+    async findOne(id: string, companyId: string) {
         const doc = await this.firestore.getCollection('documents').doc(id).get();
-        return doc.exists ? doc.data() : null;
+        if (!doc.exists) return null;
+        const data = doc.data() as EmployeeDocument;
+        if (data.companyId !== companyId) return null;
+        return data;
     }
 
-    async delete(id: string) {
-        await this.firestore.getCollection('documents').doc(id).delete();
+    async delete(id: string, companyId: string) {
+        const ref = this.firestore.getCollection('documents').doc(id);
+        const doc = await ref.get();
+        if (doc.exists) {
+            const data = doc.data() as EmployeeDocument;
+            if (data.companyId === companyId) {
+                await ref.delete();
+            }
+        }
     }
 }
 
@@ -38,20 +49,29 @@ export class DocumentsController {
     constructor(private service: DocumentsService) { }
 
     @Post()
-    create(@Body() data: EmployeeDocument) {
+    create(@Body() data: EmployeeDocument, @Req() req) {
+        const user = req.user;
+        if (!user.companyId) throw new Error('User does not belong to a company');
+        data.companyId = user.companyId;
         const v = EmployeeDocumentSchema.safeParse(data);
-        if (!v.success) throw new Error('Invalid data');
+        if (!v.success) throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
         return this.service.create(data);
     }
 
     @Get()
-    findAll(@Query('employeeId') eid: string) { return this.service.findAll(eid); }
+    findAll(@Query('employeeId') eid: string, @Req() req) {
+        return this.service.findAll(req.user.companyId, eid);
+    }
 
     @Get(':id')
-    findOne(@Param('id') id: string) { return this.service.findOne(id); }
+    findOne(@Param('id') id: string, @Req() req) {
+        return this.service.findOne(id, req.user.companyId);
+    }
 
     @Delete(':id')
-    remove(@Param('id') id: string) { return this.service.delete(id); }
+    remove(@Param('id') id: string, @Req() req) {
+        return this.service.delete(id, req.user.companyId);
+    }
 }
 
 @Module({

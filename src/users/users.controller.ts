@@ -9,8 +9,11 @@ export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Post()
-    async create(@Body() userData: User) {
-        // Basic validation
+    async create(@Body() userData: User, @Req() req) {
+        const user = req.user;
+        // Force current user's company if applicable? (Maybe only admin creates users)
+        if (user.companyId) userData.companyId = user.companyId;
+
         const result = UserSchema.safeParse(userData);
         if (!result.success) {
             throw new Error('Validation failed: ' + JSON.stringify(result.error.issues));
@@ -20,19 +23,14 @@ export class UsersController {
 
     @Get()
     async findAll(@Req() req) {
-        // In a real app, strict tenant filtering should happen here or in service
-        // For now, listing all users might be restricted to super admin
         const user = req.user;
-        // Example: if (user.role !== 'admin') throw new ForbiddenException();
-        return this.usersService.findAll();
+        if (!user.companyId) return []; // or return this.usersService.findAll() if superadmin
+        return this.usersService.findAll(user.companyId);
     }
 
     @Get('me')
     async getMe(@Req() req) {
-        // The auth guard populates req.user with decoded token
-        // We should fetch the full user profile from our DB matching the firebase uid or email
         const firebaseUser = req.user;
-        // Assuming we link by email
         if (firebaseUser.email) {
             return this.usersService.findByEmail(firebaseUser.email);
         }
@@ -40,17 +38,35 @@ export class UsersController {
     }
 
     @Get(':id')
-    async findOne(@Param('id') id: string) {
-        return this.usersService.findOne(id);
+    async findOne(@Param('id') id: string, @Req() req) {
+        const user = req.user;
+        const target = await this.usersService.findOne(id);
+        if (!target) return null;
+        if (user.companyId && target.companyId !== user.companyId) {
+            throw new Error('Forbidden');
+        }
+        return target;
     }
 
     @Put(':id')
-    async update(@Param('id') id: string, @Body() updateData: Partial<User>) {
+    async update(@Param('id') id: string, @Body() updateData: Partial<User>, @Req() req) {
+        const user = req.user;
+        const target = await this.usersService.findOne(id);
+        if (!target) return null;
+        if (user.companyId && target.companyId !== user.companyId) {
+            throw new Error('Forbidden');
+        }
         return this.usersService.update(id, updateData);
     }
 
     @Delete(':id')
-    async remove(@Param('id') id: string) {
+    async remove(@Param('id') id: string, @Req() req) {
+        const user = req.user;
+        const target = await this.usersService.findOne(id);
+        if (!target) return;
+        if (user.companyId && target.companyId !== user.companyId) {
+            throw new Error('Forbidden');
+        }
         return this.usersService.delete(id);
     }
 }

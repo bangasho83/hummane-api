@@ -17,15 +17,16 @@ export class UsersService {
             createdAt: new Date().toISOString(),
         };
 
-        // Validate with Zod before saving (optional here if Controller does it, but good practice)
-        // UserSchema.parse(newUser); 
-
         await this.firestoreService.getCollection(this.collectionName).doc(id).set(newUser);
         return newUser;
     }
 
-    async findAll(): Promise<User[]> {
-        const snapshot = await this.firestoreService.getCollection(this.collectionName).get();
+    async findAll(companyId?: string): Promise<User[]> {
+        let query: FirebaseFirestore.Query = this.firestoreService.getCollection(this.collectionName);
+        if (companyId) {
+            query = query.where('companyId', '==', companyId);
+        }
+        const snapshot = await query.get();
         return snapshot.docs.map(doc => doc.data() as User);
     }
 

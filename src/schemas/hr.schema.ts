@@ -151,6 +151,7 @@ export const FeedbackEntrySchema = z.object({
 
 export const EmployeeDocumentSchema = z.object({
     id: z.string().optional(),
+    companyId: z.string().min(1),
     employeeId: z.string().min(1),
     name: z.string().min(1),
     type: DocumentKindEnum,

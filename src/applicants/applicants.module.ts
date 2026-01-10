@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query } from '@nestjs/common';
+import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { Applicant, ApplicantSchema } from '../schemas/hr.schema';
@@ -15,26 +15,41 @@ export class ApplicantsService {
         return doc;
     }
 
-    async findAll(companyId?: string) {
-        let query: FirebaseFirestore.Query = this.firestore.getCollection('applicants');
-        if (companyId) query = query.where('companyId', '==', companyId);
-        const snap = await query.get();
+    async findAll(companyId: string) {
+        const snap = await this.firestore.getCollection('applicants')
+            .where('companyId', '==', companyId)
+            .get();
         return snap.docs.map(d => d.data());
     }
 
-    async findOne(id: string) {
+    async findOne(id: string, companyId: string) {
         const doc = await this.firestore.getCollection('applicants').doc(id).get();
-        return doc.exists ? doc.data() : null;
+        if (!doc.exists) return null;
+        const data = doc.data() as Applicant;
+        if (data.companyId !== companyId) return null;
+        return data;
     }
 
-    async update(id: string, data: Partial<Applicant>) {
+    async update(id: string, data: Partial<Applicant>, companyId: string) {
         const ref = this.firestore.getCollection('applicants').doc(id);
+        const doc = await ref.get();
+        if (!doc.exists) return null;
+        const currentData = doc.data() as Applicant;
+        if (currentData.companyId !== companyId) return null;
+
         await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
         return (await ref.get()).data();
     }
 
-    async delete(id: string) {
-        await this.firestore.getCollection('applicants').doc(id).delete();
+    async delete(id: string, companyId: string) {
+        const ref = this.firestore.getCollection('applicants').doc(id);
+        const doc = await ref.get();
+        if (doc.exists) {
+            const data = doc.data() as Applicant;
+            if (data.companyId === companyId) {
+                await ref.delete();
+            }
+        }
     }
 }
 
@@ -44,23 +59,36 @@ export class ApplicantsController {
     constructor(private service: ApplicantsService) { }
 
     @Post()
-    create(@Body() data: Applicant) {
+    create(@Body() data: Applicant, @Req() req) {
+        const user = req.user;
+        if (!user.companyId) throw new Error('User does not belong to a company');
+
+        data.companyId = user.companyId;
+
         const v = ApplicantSchema.safeParse(data);
-        if (!v.success) throw new Error('Invalid data');
+        if (!v.success) throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
         return this.service.create(data);
     }
 
     @Get()
-    findAll(@Query('companyId') cid: string) { return this.service.findAll(cid); }
+    findAll(@Req() req) {
+        return this.service.findAll(req.user.companyId);
+    }
 
     @Get(':id')
-    findOne(@Param('id') id: string) { return this.service.findOne(id); }
+    findOne(@Param('id') id: string, @Req() req) {
+        return this.service.findOne(id, req.user.companyId);
+    }
 
     @Put(':id')
-    update(@Param('id') id: string, @Body() data: Partial<Applicant>) { return this.service.update(id, data); }
+    update(@Param('id') id: string, @Body() data: Partial<Applicant>, @Req() req) {
+        return this.service.update(id, data, req.user.companyId);
+    }
 
     @Delete(':id')
-    remove(@Param('id') id: string) { return this.service.delete(id); }
+    remove(@Param('id') id: string, @Req() req) {
+        return this.service.delete(id, req.user.companyId);
+    }
 }
 
 @Module({

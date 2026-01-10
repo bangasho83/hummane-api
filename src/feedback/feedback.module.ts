@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query } from '@nestjs/common';
+import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { FeedbackCard, FeedbackCardSchema, FeedbackEntry, FeedbackEntrySchema } from '../schemas/hr.schema';
@@ -14,15 +14,39 @@ export class FeedbackCardsService {
         await this.firestore.getCollection('feedbackCards').doc(id).set(doc);
         return doc;
     }
-    async findAll(companyId?: string) {
-        let query: FirebaseFirestore.Query = this.firestore.getCollection('feedbackCards');
-        if (companyId) query = query.where('companyId', '==', companyId);
-        const snap = await query.get();
+    async findAll(companyId: string) {
+        const snap = await this.firestore.getCollection('feedbackCards')
+            .where('companyId', '==', companyId)
+            .get();
         return snap.docs.map(d => d.data());
     }
-    async findOne(id: string) { const d = await this.firestore.getCollection('feedbackCards').doc(id).get(); return d.exists ? d.data() as FeedbackCard : null; }
-    async update(id: string, data: Partial<FeedbackCard>) { await this.firestore.getCollection('feedbackCards').doc(id).set({ ...data, updatedAt: new Date().toISOString() }, { merge: true }); return this.findOne(id); }
-    async delete(id: string) { await this.firestore.getCollection('feedbackCards').doc(id).delete(); }
+    async findOne(id: string, companyId: string) {
+        const d = await this.firestore.getCollection('feedbackCards').doc(id).get();
+        if (!d.exists) return null;
+        const data = d.data() as FeedbackCard;
+        if (data.companyId !== companyId) return null;
+        return data;
+    }
+    async update(id: string, data: Partial<FeedbackCard>, companyId: string) {
+        const ref = this.firestore.getCollection('feedbackCards').doc(id);
+        const doc = await ref.get();
+        if (!doc.exists) return null;
+        const currentData = doc.data() as FeedbackCard;
+        if (currentData.companyId !== companyId) return null;
+
+        await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        return this.findOne(id, companyId);
+    }
+    async delete(id: string, companyId: string) {
+        const ref = this.firestore.getCollection('feedbackCards').doc(id);
+        const doc = await ref.get();
+        if (doc.exists) {
+            const data = doc.data() as FeedbackCard;
+            if (data.companyId === companyId) {
+                await ref.delete();
+            }
+        }
+    }
 }
 
 @Injectable()
@@ -34,15 +58,39 @@ export class FeedbackEntriesService {
         await this.firestore.getCollection('feedbackEntries').doc(id).set(doc);
         return doc;
     }
-    async findAll(companyId?: string) {
-        let query: FirebaseFirestore.Query = this.firestore.getCollection('feedbackEntries');
-        if (companyId) query = query.where('companyId', '==', companyId);
-        const snap = await query.get();
+    async findAll(companyId: string) {
+        const snap = await this.firestore.getCollection('feedbackEntries')
+            .where('companyId', '==', companyId)
+            .get();
         return snap.docs.map(d => d.data());
     }
-    async findOne(id: string) { const d = await this.firestore.getCollection('feedbackEntries').doc(id).get(); return d.exists ? d.data() as FeedbackEntry : null; }
-    async update(id: string, data: Partial<FeedbackEntry>) { await this.firestore.getCollection('feedbackEntries').doc(id).set({ ...data, updatedAt: new Date().toISOString() }, { merge: true }); return this.findOne(id); }
-    async delete(id: string) { await this.firestore.getCollection('feedbackEntries').doc(id).delete(); }
+    async findOne(id: string, companyId: string) {
+        const d = await this.firestore.getCollection('feedbackEntries').doc(id).get();
+        if (!d.exists) return null;
+        const data = d.data() as FeedbackEntry;
+        if (data.companyId !== companyId) return null;
+        return data;
+    }
+    async update(id: string, data: Partial<FeedbackEntry>, companyId: string) {
+        const ref = this.firestore.getCollection('feedbackEntries').doc(id);
+        const doc = await ref.get();
+        if (!doc.exists) return null;
+        const currentData = doc.data() as FeedbackEntry;
+        if (currentData.companyId !== companyId) return null;
+
+        await ref.set({ ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        return this.findOne(id, companyId);
+    }
+    async delete(id: string, companyId: string) {
+        const ref = this.firestore.getCollection('feedbackEntries').doc(id);
+        const doc = await ref.get();
+        if (doc.exists) {
+            const data = doc.data() as FeedbackEntry;
+            if (data.companyId === companyId) {
+                await ref.delete();
+            }
+        }
+    }
 }
 
 // Controllers
@@ -50,22 +98,36 @@ export class FeedbackEntriesService {
 @UseGuards(AuthGuard)
 export class FeedbackCardsController {
     constructor(private service: FeedbackCardsService) { }
-    @Post() create(@Body() d: FeedbackCard) { const v = FeedbackCardSchema.safeParse(d); if (!v.success) throw new Error('Invalid'); return this.service.create(d); }
-    @Get() findAll(@Query('companyId') c: string) { return this.service.findAll(c); }
-    @Get(':id') findOne(@Param('id') id: string) { return this.service.findOne(id); }
-    @Put(':id') update(@Param('id') id: string, @Body() d: Partial<FeedbackCard>) { return this.service.update(id, d); }
-    @Delete(':id') remove(@Param('id') id: string) { return this.service.delete(id); }
+    @Post() create(@Body() d: FeedbackCard, @Req() req) {
+        const user = req.user;
+        if (!user.companyId) throw new Error('User does not belong to a company');
+        d.companyId = user.companyId;
+        const v = FeedbackCardSchema.safeParse(d);
+        if (!v.success) throw new Error('Invalid: ' + JSON.stringify(v.error.issues));
+        return this.service.create(d);
+    }
+    @Get() findAll(@Req() req) { return this.service.findAll(req.user.companyId); }
+    @Get(':id') findOne(@Param('id') id: string, @Req() req) { return this.service.findOne(id, req.user.companyId); }
+    @Put(':id') update(@Param('id') id: string, @Body() d: Partial<FeedbackCard>, @Req() req) { return this.service.update(id, d, req.user.companyId); }
+    @Delete(':id') remove(@Param('id') id: string, @Req() req) { return this.service.delete(id, req.user.companyId); }
 }
 
 @Controller('feedback-entries')
 @UseGuards(AuthGuard)
 export class FeedbackEntriesController {
     constructor(private service: FeedbackEntriesService) { }
-    @Post() create(@Body() d: FeedbackEntry) { const v = FeedbackEntrySchema.safeParse(d); if (!v.success) throw new Error('Invalid'); return this.service.create(d); }
-    @Get() findAll(@Query('companyId') c: string) { return this.service.findAll(c); }
-    @Get(':id') findOne(@Param('id') id: string) { return this.service.findOne(id); }
-    @Put(':id') update(@Param('id') id: string, @Body() d: Partial<FeedbackEntry>) { return this.service.update(id, d); }
-    @Delete(':id') remove(@Param('id') id: string) { return this.service.delete(id); }
+    @Post() create(@Body() d: FeedbackEntry, @Req() req) {
+        const user = req.user;
+        if (!user.companyId) throw new Error('User does not belong to a company');
+        d.companyId = user.companyId;
+        const v = FeedbackEntrySchema.safeParse(d);
+        if (!v.success) throw new Error('Invalid: ' + JSON.stringify(v.error.issues));
+        return this.service.create(d);
+    }
+    @Get() findAll(@Req() req) { return this.service.findAll(req.user.companyId); }
+    @Get(':id') findOne(@Param('id') id: string, @Req() req) { return this.service.findOne(id, req.user.companyId); }
+    @Put(':id') update(@Param('id') id: string, @Body() d: Partial<FeedbackEntry>, @Req() req) { return this.service.update(id, d, req.user.companyId); }
+    @Delete(':id') remove(@Param('id') id: string, @Req() req) { return this.service.delete(id, req.user.companyId); }
 }
 
 @Module({
