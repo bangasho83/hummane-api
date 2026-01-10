@@ -86,47 +86,44 @@ export class AuthService {
                 throw new UnauthorizedException('Email is required in Firebase token');
             }
 
-            console.log(`[AuthDebug] Looking for user with email: ${email}`);
-            // 1. Check if user exists in Hummane DB
+            console.log(`[AuthDebug] Login attempt for: ${email}`);
             let user = await this.usersService.findByEmail(email);
-            console.log(`[AuthDebug] User found: ${!!user}`);
 
-            // 2. If not, create user (Sync)
             if (!user) {
-                console.log('[AuthDebug] Creating new user...');
                 user = await this.usersService.create({
                     id: uuidv4(),
                     email: email,
                     name: name || 'Unknown User',
                     createdAt: new Date().toISOString()
                 });
-                console.log('[AuthDebug] User created.');
             }
 
-            // 3. Resolve Company & Self-Healing
+            // 3. Resolve Company
             let company = null;
             if (user.companyId) {
-                console.log(`[AuthDebug] Fetching company details for ID: ${user.companyId}`);
                 company = await this.companiesService.findOne(user.companyId);
             } else {
-                // Self-healing: Look for company owned by user if companyId is missing on profile
-                console.log(`[AuthDebug] User profile missing companyId. Searching for owned company for: ${user.id}`);
+                // Self-healing: Look for company owned by user.id (NOT uid)
                 company = await this.companiesService.findByOwner(user.id);
                 if (company) {
-                    console.log(`[AuthDebug] Found owned company: ${company.id}. Updating user profile.`);
                     await this.usersService.update(user.id, { companyId: company.id });
-                    user.companyId = company.id; // Sync local object for payload
+                    user.companyId = company.id;
                 }
             }
 
-            // 4. Create Final JWT Payload (ONLY NOW)
+            // EXTRA PROTECTION: If companyId is falsy or "undefined" string, treat as null
+            if (!user.companyId || user.companyId === 'undefined') {
+                user.companyId = undefined;
+                company = null;
+            }
+
             const payload: JwtPayload = {
                 sub: user.id,
                 email: user.email,
                 companyId: user.companyId
             };
 
-            console.log(`[AuthDebug] Issuing JWT for user: ${user.email} with companyId: ${user.companyId}`);
+            console.log(`[AuthDebug] JWT Payload established:`, JSON.stringify(payload));
 
             return {
                 access_token: await this.jwtService.signAsync(payload),
@@ -135,10 +132,7 @@ export class AuthService {
             };
         } catch (error) {
             console.error('[AuthDebug] Login failed:', error);
-            if (error instanceof UnauthorizedException) {
-                throw error;
-            }
-            throw new Error(`Login failed: ${error.message}`);
+            throw (error instanceof UnauthorizedException) ? error : new Error(`Login failed: ${error.message}`);
         }
     }
 

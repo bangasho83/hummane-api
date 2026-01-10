@@ -9,13 +9,15 @@ export class DepartmentsService {
     constructor(private firestore: FirestoreService) { }
 
     async create(data: Department) {
+        console.log(`[DepartmentsService] [SAVE_TRACE] Checking companyId for:`, data.name);
         if (!data.companyId) {
-            console.error(`[DepartmentsService] [CRITICAL] ATTEMPTED TO CREATE DEPARTMENT WITHOUT COMPANY_ID! Data:`, JSON.stringify(data));
+            console.error(`[DepartmentsService] [CRITICAL] MISSING COMPANY_ID!`, JSON.stringify(data));
             throw new Error('Internal Error: companyId is missing in service layer');
         }
 
         const id = data.id || uuidv4();
         const doc = { ...data, id, createdAt: new Date().toISOString() };
+        console.log(`[DepartmentsService] [SAVE_TRACE] Final Document:`, JSON.stringify(doc));
 
         await this.firestore.getCollection('departments').doc(id).set(doc);
         return doc;
@@ -74,6 +76,7 @@ export class DepartmentsController {
         }
 
         // 1. Force companyId from token
+        console.log(`[DepartmentsController] [TRACE] User companyId: ${user.companyId}`);
         data.companyId = user.companyId;
 
         // 2. Validate and retrieve clean data

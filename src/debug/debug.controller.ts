@@ -94,6 +94,8 @@ export class DebugController {
     @UseGuards(AuthGuard)
     authSession(@Req() req) {
         return {
+            deployment: 'V5_STRICT_MULTI_TENANCY_DEBUG',
+            serverTime: new Date().toISOString(),
             message: 'Authentication session is active',
             user: req.user
         };
