@@ -101,10 +101,18 @@ export class FeedbackCardsController {
     @Post() create(@Body() d: FeedbackCard, @Req() req) {
         const user = req.user;
         if (!user.companyId) throw new Error('User does not belong to a company');
+
+        // 1. Force companyId from token
         d.companyId = user.companyId;
+
+        // 2. Validate and retrieve clean data
         const v = FeedbackCardSchema.safeParse(d);
-        if (!v.success) throw new Error('Invalid: ' + JSON.stringify(v.error.issues));
-        return this.service.create(d);
+        if (!v.success) {
+            throw new Error('Invalid: ' + JSON.stringify(v.error.issues));
+        }
+
+        // 3. Persist validated data
+        return this.service.create(v.data as FeedbackCard);
     }
     @Get() findAll(@Req() req) { return this.service.findAll(req.user.companyId); }
     @Get(':id') findOne(@Param('id') id: string, @Req() req) { return this.service.findOne(id, req.user.companyId); }
@@ -119,10 +127,18 @@ export class FeedbackEntriesController {
     @Post() create(@Body() d: FeedbackEntry, @Req() req) {
         const user = req.user;
         if (!user.companyId) throw new Error('User does not belong to a company');
+
+        // 1. Force companyId from token
         d.companyId = user.companyId;
+
+        // 2. Validate and retrieve clean data
         const v = FeedbackEntrySchema.safeParse(d);
-        if (!v.success) throw new Error('Invalid: ' + JSON.stringify(v.error.issues));
-        return this.service.create(d);
+        if (!v.success) {
+            throw new Error('Invalid: ' + JSON.stringify(v.error.issues));
+        }
+
+        // 3. Persist validated data
+        return this.service.create(v.data as FeedbackEntry);
     }
     @Get() findAll(@Req() req) { return this.service.findAll(req.user.companyId); }
     @Get(':id') findOne(@Param('id') id: string, @Req() req) { return this.service.findOne(id, req.user.companyId); }

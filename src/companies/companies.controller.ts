@@ -20,7 +20,7 @@ export class CompaniesController {
         if (!result.success) {
             throw new Error('Validation failed: ' + JSON.stringify(result.error.issues));
         }
-        return this.companiesService.create(companyData);
+        return this.companiesService.create(result.data as Company);
     }
 
     @Get()

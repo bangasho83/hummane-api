@@ -52,10 +52,18 @@ export class DocumentsController {
     create(@Body() data: EmployeeDocument, @Req() req) {
         const user = req.user;
         if (!user.companyId) throw new Error('User does not belong to a company');
+
+        // 1. Force companyId from token
         data.companyId = user.companyId;
+
+        // 2. Validate and retrieve clean data
         const v = EmployeeDocumentSchema.safeParse(data);
-        if (!v.success) throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
-        return this.service.create(data);
+        if (!v.success) {
+            throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
+        }
+
+        // 3. Persist validated data
+        return this.service.create(v.data as EmployeeDocument);
     }
 
     @Get()

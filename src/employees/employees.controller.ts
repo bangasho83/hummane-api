@@ -11,16 +11,19 @@ export class EmployeesController {
     @Post()
     async create(@Body() data: Employee, @Req() req) {
         const user = req.user;
-        if (!user.companyId) throw new Error('User does not belong to a company'); // Should be caught by AuthGuard ideally or handled
+        if (!user.companyId) throw new Error('User does not belong to a company');
 
-        // Force companyId from token
+        // 1. Force companyId from token
         data.companyId = user.companyId;
 
+        // 2. Validate and retrieve clean data
         const result = EmployeeSchema.safeParse(data);
         if (!result.success) {
             throw new Error('Validation failed: ' + JSON.stringify(result.error.issues));
         }
-        return this.employeesService.create(data);
+
+        // 3. Persist validated data
+        return this.employeesService.create(result.data as Employee);
     }
 
     @Get()

@@ -103,14 +103,7 @@ export class AuthService {
                 console.log('[AuthDebug] User created.');
             }
 
-            // 3. Issue Hummane JWT
-            const payload: JwtPayload = {
-                sub: user.id,
-                email: user.email,
-                companyId: user.companyId
-            };
-
-            // 4. Fetch Company Details
+            // 3. Resolve Company & Self-Healing
             let company = null;
             if (user.companyId) {
                 console.log(`[AuthDebug] Fetching company details for ID: ${user.companyId}`);
@@ -121,14 +114,22 @@ export class AuthService {
                 company = await this.companiesService.findByOwner(user.id);
                 if (company) {
                     console.log(`[AuthDebug] Found owned company: ${company.id}. Updating user profile.`);
-                    // Update user profile in background to save this link
                     await this.usersService.update(user.id, { companyId: company.id });
-                    user.companyId = company.id; // Update local object for JWT payload consistency if needed (though payload is already signed)
+                    user.companyId = company.id; // Sync local object for payload
                 }
             }
 
+            // 4. Create Final JWT Payload (ONLY NOW)
+            const payload: JwtPayload = {
+                sub: user.id,
+                email: user.email,
+                companyId: user.companyId
+            };
+
+            console.log(`[AuthDebug] Issuing JWT for user: ${user.email} with companyId: ${user.companyId}`);
+
             return {
-                access_token: this.jwtService.sign(payload),
+                access_token: await this.jwtService.signAsync(payload),
                 user: user,
                 company: company,
             };

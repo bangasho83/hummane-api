@@ -63,11 +63,17 @@ export class ApplicantsController {
         const user = req.user;
         if (!user.companyId) throw new Error('User does not belong to a company');
 
+        // 1. Force companyId from token
         data.companyId = user.companyId;
 
+        // 2. Validate and retrieve clean data
         const v = ApplicantSchema.safeParse(data);
-        if (!v.success) throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
-        return this.service.create(data);
+        if (!v.success) {
+            throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
+        }
+
+        // 3. Persist validated data
+        return this.service.create(v.data as Applicant);
     }
 
     @Get()

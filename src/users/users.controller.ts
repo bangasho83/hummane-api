@@ -18,7 +18,7 @@ export class UsersController {
         if (!result.success) {
             throw new Error('Validation failed: ' + JSON.stringify(result.error.issues));
         }
-        return this.usersService.create(userData);
+        return this.usersService.create(result.data as User);
     }
 
     @Get()
