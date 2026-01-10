@@ -10,7 +10,11 @@ export default async function handler(req: any, res: any) {
             AppModule,
             new FastifyAdapter()
         );
-        app.enableCors(); // Ensure CORS is enabled here too
+        app.enableCors({
+            origin: true,
+            methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+            credentials: true,
+        });
         await app.init();
     }
 
