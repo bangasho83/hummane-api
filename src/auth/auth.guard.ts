@@ -16,6 +16,7 @@ export class AuthGuard implements CanActivate {
         const token = authHeader.split('Bearer ')[1];
         try {
             const payload = await this.jwtService.verifyAsync(token);
+            console.log(`[AuthGuard] [DEBUG] Raw JWT Payload:`, JSON.stringify(payload));
 
             // Payload has { sub: userId, email, companyId }
             request.user = {
@@ -24,8 +25,11 @@ export class AuthGuard implements CanActivate {
                 companyId: payload.companyId
             };
 
+            console.log(`[AuthGuard] [DEBUG] Populated req.user:`, JSON.stringify(request.user));
+
             return true;
         } catch (error) {
+            console.error(`[AuthGuard] [ERROR] Token Verification Failed:`, error.message);
             throw new UnauthorizedException('Invalid or expired token');
         }
     }
