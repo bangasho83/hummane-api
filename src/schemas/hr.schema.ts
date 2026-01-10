@@ -26,7 +26,7 @@ export const DepartmentSchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
     name: z.string().min(1),
-    description: z.string().optional(),
+    desc: z.string().optional(),
     createdAt: z.string().optional(),
 });
 

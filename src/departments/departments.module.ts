@@ -9,8 +9,6 @@ export class DepartmentsService {
     constructor(private firestore: FirestoreService) { }
 
     async create(data: Department) {
-        console.log(`[DepartmentsService] [DEBUG] PRE-SAVE DATA:`, JSON.stringify(data));
-
         if (!data.companyId) {
             console.error(`[DepartmentsService] [CRITICAL] ATTEMPTED TO CREATE DEPARTMENT WITHOUT COMPANY_ID! Data:`, JSON.stringify(data));
             throw new Error('Internal Error: companyId is missing in service layer');
@@ -18,7 +16,6 @@ export class DepartmentsService {
 
         const id = data.id || uuidv4();
         const doc = { ...data, id, createdAt: new Date().toISOString() };
-        console.log(`[DepartmentsService] [DEBUG] FINAL DOC:`, JSON.stringify(doc));
 
         await this.firestore.getCollection('departments').doc(id).set(doc);
         return doc;
@@ -71,25 +68,19 @@ export class DepartmentsController {
     @Post()
     create(@Body() data: Department, @Req() req) {
         const user = req.user;
-        console.log(`[DepartmentsController] [DEBUG] FULL USER OBJECT:`, JSON.stringify(user));
 
         if (!user || !user.companyId) {
-            console.error(`[DepartmentsController] [ERROR] No companyId on req.user! User:`, JSON.stringify(user));
             throw new Error('User does not belong to a company or session is invalid');
         }
 
         // 1. Force companyId from token
-        console.log(`[DepartmentsController] [DEBUG] Injecting companyId: ${user.companyId}`);
         data.companyId = user.companyId;
 
         // 2. Validate and retrieve clean data
         const v = DepartmentSchema.safeParse(data);
         if (!v.success) {
-            console.error(`[DepartmentsController] [ERROR] Zod Validation Failed:`, JSON.stringify(v.error.issues));
             throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
         }
-
-        console.log(`[DepartmentsController] [DEBUG] Final payload for service:`, JSON.stringify(v.data));
 
         // 3. Persist validated data
         return this.service.create(v.data as Department);
