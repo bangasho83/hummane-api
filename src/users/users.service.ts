@@ -12,22 +12,24 @@ export class UsersService {
 
     async create(userData: User): Promise<User> {
         const id = userData.id || uuidv4();
+        const timestamp = Timestamp.now();
         const newUser = {
             ...userData,
             id,
-            createdAt: Timestamp.now(),
+            createdAt: timestamp,
+            updatedAt: timestamp,
         };
 
         await this.firestoreService.getCollection(this.collectionName).doc(id).set(newUser);
         return newUser;
     }
 
-    async findAll(companyId?: string): Promise<User[]> {
+    async findAll(companyId?: string, limit = 50): Promise<User[]> {
         let query: FirebaseFirestore.Query = this.firestoreService.getCollection(this.collectionName);
         if (companyId) {
             query = query.where('companyId', '==', companyId);
         }
-        const snapshot = await query.get();
+        const snapshot = await query.limit(limit).get();
         return snapshot.docs.map(doc => doc.data() as User);
     }
 

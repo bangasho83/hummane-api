@@ -1,0 +1,20 @@
+{
+  "employmentType": ["Contract", "Full-time", "Intern", "Part-time"],
+  "gender": ["Male", "Female", "Non-binary", "Prefer not to say"],
+  "jobStatus": ["open", "closed"],
+  "feedbackEntryType": ["interview", "performance", "onboarding", "offboarding", "general"],
+  "applicantStatus": ["new", "screening", "interview", "offer", "rejected", "hired"],
+  "leaveUnit": ["Day", "Hour"],
+  "weekday": ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
+  "feedbackSubject": ["Team Member", "Applicant"],
+  "invitationStatus": ["pending", "accepted", "expired", "revoked"],
+  "documentKind": [
+    "Government ID",
+    "CV (Curriculum Vitae)",
+    "Educational Documents",
+    "Experience Letter",
+    "Salary Slip",
+    "Personality Test Report",
+    "Contract"
+  ]
+}

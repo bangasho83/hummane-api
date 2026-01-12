@@ -1,9 +1,11 @@
-import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { CompanyGuard } from '../auth/company.guard';
 import { Holiday, HolidaySchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
+import { parseLimit } from '../utils/pagination';
 
 @Injectable()
 export class HolidaysService {
@@ -11,14 +13,16 @@ export class HolidaysService {
 
     async create(data: Holiday) {
         const id = data.id || uuidv4();
-        const doc = { ...data, id, createdAt: Timestamp.now() };
+        const timestamp = Timestamp.now();
+        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
         await this.firestore.getCollection('holidays').doc(id).set(doc);
         return doc;
     }
 
-    async findAll(companyId: string) {
+    async findAll(companyId: string, limit = 50) {
         const snap = await this.firestore.getCollection('holidays')
             .where('companyId', '==', companyId)
+            .limit(limit)
             .get();
         return snap.docs.map(d => d.data());
     }
@@ -55,25 +59,23 @@ export class HolidaysService {
 }
 
 @Controller('holidays')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, CompanyGuard)
 export class HolidaysController {
     constructor(private service: HolidaysService) { }
 
     @Post()
     create(@Body() data: Holiday, @Req() req) {
         const user = req.user;
-        if (!user.companyId) throw new Error('User does not belong to a company');
-
         data.companyId = user.companyId;
 
         const v = HolidaySchema.safeParse(data);
-        if (!v.success) throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
+        if (!v.success) throw new BadRequestException(v.error.issues);
         return this.service.create(data);
     }
 
     @Get()
-    findAll(@Req() req) {
-        return this.service.findAll(req.user.companyId);
+    findAll(@Req() req, @Query('limit') limit?: string) {
+        return this.service.findAll(req.user.companyId, parseLimit(limit));
     }
 
     @Get(':id')
@@ -83,7 +85,9 @@ export class HolidaysController {
 
     @Put(':id')
     update(@Param('id') id: string, @Body() data: Partial<Holiday>, @Req() req) {
-        return this.service.update(id, data, req.user.companyId);
+        const updateData = { ...data };
+        delete (updateData as Partial<Holiday>).companyId;
+        return this.service.update(id, updateData, req.user.companyId);
     }
 
     @Delete(':id')

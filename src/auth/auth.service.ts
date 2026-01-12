@@ -95,7 +95,8 @@ export class AuthService {
                     id: uuidv4(),
                     email: email,
                     name: name || 'Unknown User',
-                    createdAt: Timestamp.now()
+                    createdAt: Timestamp.now(),
+                    updatedAt: Timestamp.now()
                 });
             }
 

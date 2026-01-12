@@ -13,6 +13,22 @@ export const UserSchema = z.object({
     updatedAt: TimestampSchema.optional(),
 });
 
+export const InvitationStatusEnum = z.string().min(1);
+
+export const UserInvitationSchema = z.object({
+    id: z.string().optional(),
+    companyId: z.string().min(1),
+    email: z.string().email(),
+    invitedBy: z.string().min(1),
+    employeeId: z.string().optional(),
+    status: InvitationStatusEnum.optional(),
+    tokenHash: z.string().optional(),
+    expiresAt: TimestampSchema.optional(),
+    acceptedAt: TimestampSchema.optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
+});
+
 const WorkDaySchema = z.object({
     open: z.boolean(),
     start: z.string().optional(),
@@ -44,3 +60,4 @@ export const CompanySchema = z.object({
 
 export type User = z.infer<typeof UserSchema>;
 export type Company = z.infer<typeof CompanySchema>;
+export type UserInvitation = z.infer<typeof UserInvitationSchema>;

@@ -9,6 +9,7 @@ Most endpoints require a JWT:
 -H "Authorization: Bearer $TOKEN"
 
 All tenant-scoped payloads include companyId (the API also enforces it from the JWT).
+List endpoints accept `?limit=` (default 50, max 100).
 
 ## Auth
 ### POST /auth/login
@@ -45,6 +46,38 @@ curl -X PUT "$BASE_URL/users/YOUR_USER_ID" \
 curl -X DELETE "$BASE_URL/users/YOUR_USER_ID" \
   -H "Authorization: Bearer $TOKEN"
 
+Invite flow (single-company users):
+1) Create an employee record with the user's email.
+2) Create an invite via `POST /invitations` (stores the invite + sends Firebase link).
+3) When the user accepts and logs in, link `employees.userId` and let them complete their profile.
+
+## Invitations
+### POST /invitations
+curl -X POST "$BASE_URL/invitations" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","employeeId":"YOUR_EMPLOYEE_ID","expiresAt":"2024-12-31T23:59:59Z","companyId":"YOUR_COMPANY_ID"}'
+
+Response includes `inviteToken` for your email flow.
+
+### GET /invitations
+curl -X GET "$BASE_URL/invitations" \
+  -H "Authorization: Bearer $TOKEN"
+
+### GET /invitations/:id
+curl -X GET "$BASE_URL/invitations/YOUR_INVITATION_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+### PUT /invitations/:id
+curl -X PUT "$BASE_URL/invitations/YOUR_INVITATION_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"revoked","companyId":"YOUR_COMPANY_ID"}'
+
+### DELETE /invitations/:id
+curl -X DELETE "$BASE_URL/invitations/YOUR_INVITATION_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
 ## Companies
 ### POST /companies
 curl -X POST "$BASE_URL/companies" \
@@ -75,7 +108,7 @@ curl -X DELETE "$BASE_URL/companies/YOUR_COMPANY_ID" \
 curl -X POST "$BASE_URL/employees" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"employeeId":"EMP-001","companyId":"YOUR_COMPANY_ID","name":"Jane Doe","email":"jane@example.com","startDate":"2024-01-01","employmentType":"Full-time","gender":"Female","documents":{"files":[{"name":"Passport","url":"https://example.com/jane-passport.pdf"},{"name":"Resume","url":"https://example.com/jane-resume.pdf"}]}}'
+  -d '{"employeeId":"EMP-001","companyId":"YOUR_COMPANY_ID","userId":"YOUR_USER_ID","departmentId":"YOUR_DEPARTMENT_ID","reportingManagerId":"YOUR_MANAGER_EMPLOYEE_ID","name":"Jane Doe","email":"jane@example.com","startDate":"2024-01-01","employmentType":"Full-time","gender":"Female"}'
 
 ### GET /employees
 curl -X GET "$BASE_URL/employees" \
@@ -89,7 +122,7 @@ curl -X GET "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
 curl -X PUT "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"companyId":"YOUR_COMPANY_ID","documents":{"files":[{"name":"Resume","url":"https://example.com/jane-resume.pdf"}]}}'
+  -d '{"companyId":"YOUR_COMPANY_ID","userId":"YOUR_USER_ID","departmentId":"YOUR_DEPARTMENT_ID","employmentType":"Full-time"}'
 
 ### DELETE /employees/:id
 curl -X DELETE "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
@@ -100,7 +133,7 @@ curl -X DELETE "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
 curl -X POST "$BASE_URL/departments" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Engineering","desc":"Core product team","companyId":"YOUR_COMPANY_ID"}'
+  -d '{"name":"Engineering","description":"Core product team","companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /departments
 curl -X GET "$BASE_URL/departments" \
@@ -114,7 +147,7 @@ curl -X GET "$BASE_URL/departments/YOUR_DEPARTMENT_ID" \
 curl -X PUT "$BASE_URL/departments/YOUR_DEPARTMENT_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"desc":"Platform and infrastructure","companyId":"YOUR_COMPANY_ID"}'
+  -d '{"description":"Platform and infrastructure","companyId":"YOUR_COMPANY_ID"}'
 
 ### DELETE /departments/:id
 curl -X DELETE "$BASE_URL/departments/YOUR_DEPARTMENT_ID" \
@@ -150,7 +183,7 @@ curl -X DELETE "$BASE_URL/roles/YOUR_ROLE_ID" \
 curl -X POST "$BASE_URL/jobs" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Backend Engineer","status":"open","employmentType":"Full-time","companyId":"YOUR_COMPANY_ID"}'
+  -d '{"title":"Backend Engineer","departmentId":"YOUR_DEPARTMENT_ID","status":"open","employmentType":"Full-time","salaryFrom":60000,"salaryTo":85000,"companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /jobs
 curl -X GET "$BASE_URL/jobs" \
@@ -164,7 +197,7 @@ curl -X GET "$BASE_URL/jobs/YOUR_JOB_ID" \
 curl -X PUT "$BASE_URL/jobs/YOUR_JOB_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"status":"closed","companyId":"YOUR_COMPANY_ID"}'
+  -d '{"status":"closed","departmentId":"YOUR_DEPARTMENT_ID","salaryTo":90000,"companyId":"YOUR_COMPANY_ID"}'
 
 ### DELETE /jobs/:id
 curl -X DELETE "$BASE_URL/jobs/YOUR_JOB_ID" \
@@ -175,7 +208,7 @@ curl -X DELETE "$BASE_URL/jobs/YOUR_JOB_ID" \
 curl -X POST "$BASE_URL/applicants" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"fullName":"Sam Applicant","email":"sam@example.com","status":"new","appliedDate":"2024-01-02","companyId":"YOUR_COMPANY_ID","documents":{"files":["https://example.com/sam-resume.pdf","https://example.com/sam-cover-letter.docx"]}}'
+  -d '{"fullName":"Sam Applicant","email":"sam@example.com","status":"new","appliedDate":"2024-01-02","jobId":"YOUR_JOB_ID","yearsOfExperience":4.5,"currentSalary":65000,"expectedSalary":72000,"companyId":"YOUR_COMPANY_ID","documents":{"files":["https://example.com/sam-resume.pdf","https://example.com/sam-cover-letter.docx"]}}'
 
 ### GET /applicants
 curl -X GET "$BASE_URL/applicants" \
@@ -189,7 +222,7 @@ curl -X GET "$BASE_URL/applicants/YOUR_APPLICANT_ID" \
 curl -X PUT "$BASE_URL/applicants/YOUR_APPLICANT_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"status":"interview","companyId":"YOUR_COMPANY_ID","documents":{"files":["https://example.com/sam-resume.pdf"]}}'
+  -d '{"status":"interview","yearsOfExperience":5.0,"expectedSalary":75000,"companyId":"YOUR_COMPANY_ID","documents":{"files":["https://example.com/sam-resume.pdf"]}}'
 
 ### DELETE /applicants/:id
 curl -X DELETE "$BASE_URL/applicants/YOUR_APPLICANT_ID" \
@@ -225,7 +258,10 @@ curl -X DELETE "$BASE_URL/leave-types/YOUR_LEAVE_TYPE_ID" \
 curl -X POST "$BASE_URL/leaves" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"employeeId":"EMP-001","leaveTypeId":"YOUR_LEAVE_TYPE_ID","date":"2024-01-10","unit":"Day","amount":1,"note":"Family event","documents":{"files":["https://example.com/leave-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"employeeId":"EMP-001","leaveTypeId":"YOUR_LEAVE_TYPE_ID","startDate":"2024-01-16","endDate":"2024-01-18","unit":"Day","amount":1,"note":"Family event","documents":{"files":["https://example.com/leave-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
+
+Leave days are expanded per calendar date; non-working days/holidays are flagged and do not count toward quota.
+Hourly leave must use the same start/end date and `amount` is hours.
 
 ### GET /leaves
 curl -X GET "$BASE_URL/leaves" \
@@ -300,7 +336,7 @@ curl -X DELETE "$BASE_URL/feedback-cards/YOUR_CARD_ID" \
 curl -X POST "$BASE_URL/feedback-entries" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"cardId":"YOUR_CARD_ID","type":"performance","subject":{"kind":"Employee","id":"YOUR_EMPLOYEE_ID","name":"Jane Doe"},"answers":[{"questionId":"q1","answer":"Great"}],"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"cardId":"YOUR_CARD_ID","type":"performance","subjectType":"Employee","subjectId":"YOUR_EMPLOYEE_ID","subjectName":"Jane Doe","answers":[{"questionId":"q1","answer":"Great"}],"companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /feedback-entries
 curl -X GET "$BASE_URL/feedback-entries" \
@@ -341,18 +377,4 @@ curl -X GET "$BASE_URL/documents/YOUR_DOCUMENT_ID" \
 
 ### DELETE /documents/:id
 curl -X DELETE "$BASE_URL/documents/YOUR_DOCUMENT_ID" \
-  -H "Authorization: Bearer $TOKEN"
-
-## Debug
-### GET /debug/users
-curl -X GET "$BASE_URL/debug/users"
-
-### GET /debug/env-check
-curl -X GET "$BASE_URL/debug/env-check"
-
-### GET /debug/parse-check
-curl -X GET "$BASE_URL/debug/parse-check"
-
-### GET /debug/auth-session
-curl -X GET "$BASE_URL/debug/auth-session" \
   -H "Authorization: Bearer $TOKEN"

@@ -1,25 +1,25 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req, Query } from '@nestjs/common';
 import { EmployeesService } from './employees.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { CompanyGuard } from '../auth/company.guard';
 import { Employee, EmployeeSchema } from '../schemas/hr.schema';
+import { parseLimit } from '../utils/pagination';
 
 @Controller('employees')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, CompanyGuard)
 export class EmployeesController {
     constructor(private readonly employeesService: EmployeesService) { }
 
     @Post()
     async create(@Body() data: Employee, @Req() req) {
         const user = req.user;
-        if (!user.companyId) throw new Error('User does not belong to a company');
-
         // 1. Force companyId from token
         data.companyId = user.companyId;
 
         // 2. Validate and retrieve clean data
         const result = EmployeeSchema.safeParse(data);
         if (!result.success) {
-            throw new Error('Validation failed: ' + JSON.stringify(result.error.issues));
+            throw new BadRequestException(result.error.issues);
         }
 
         // 3. Persist validated data
@@ -27,30 +27,28 @@ export class EmployeesController {
     }
 
     @Get()
-    async findAll(@Req() req) {
+    async findAll(@Req() req, @Query('limit') limit?: string) {
         const user = req.user;
-        if (!user.companyId) return []; // Or throw error
-        return this.employeesService.findAll(user.companyId);
+        return this.employeesService.findAll(user.companyId, parseLimit(limit));
     }
 
     @Get(':id')
     async findOne(@Param('id') id: string, @Req() req) {
         const user = req.user;
-        if (!user.companyId) return null;
         return this.employeesService.findOne(id, user.companyId);
     }
 
     @Put(':id')
     async update(@Param('id') id: string, @Body() data: Partial<Employee>, @Req() req) {
         const user = req.user;
-        if (!user.companyId) throw new Error('User does not belong to a company');
-        return this.employeesService.update(id, data, user.companyId);
+        const updateData = { ...data };
+        delete (updateData as Partial<Employee>).companyId;
+        return this.employeesService.update(id, updateData, user.companyId);
     }
 
     @Delete(':id')
     async remove(@Param('id') id: string, @Req() req) {
         const user = req.user;
-        if (!user.companyId) throw new Error('User does not belong to a company');
         return this.employeesService.delete(id, user.companyId);
     }
 }

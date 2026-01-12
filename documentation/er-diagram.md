@@ -1,4 +1,5 @@
 %% ER Diagram
+%% NOTE: salary/leave amounts are stored as numbers but validated to 2 decimal places in the API.
 erDiagram
     COMPANY ||--o{ USER : has
     USER ||--o{ COMPANY : owns
@@ -6,16 +7,22 @@ erDiagram
     COMPANY ||--o{ EMPLOYEE : employs
     ROLE ||--o{ EMPLOYEE : assigned
     EMPLOYEE ||--o{ EMPLOYEE_DOCUMENT : has
+    COMPANY ||--o{ USER_INVITATION : invites
+    USER ||--o{ USER_INVITATION : sends
 
     COMPANY ||--o{ DEPARTMENT : has
+    DEPARTMENT ||--o{ EMPLOYEE : includes
     COMPANY ||--o{ ROLE : has
     COMPANY ||--o{ JOB : posts
+    DEPARTMENT ||--o{ JOB : organizes
     JOB ||--o{ APPLICANT : attracts
 
     COMPANY ||--o{ LEAVE_TYPE : defines
     COMPANY ||--o{ LEAVE_RECORD : tracks
+    COMPANY ||--o{ LEAVE_DAY : tracks
     LEAVE_TYPE ||--o{ LEAVE_RECORD : categorizes
     EMPLOYEE ||--o{ LEAVE_RECORD : requests
+    LEAVE_RECORD ||--o{ LEAVE_DAY : expands
 
     COMPANY ||--o{ HOLIDAY : sets
     COMPANY ||--o{ FEEDBACK_CARD : templates
@@ -43,16 +50,32 @@ erDiagram
         timestamp updatedAt
     }
 
+    USER_INVITATION {
+        uuid id
+        uuid companyId
+        email email
+        uuid invitedBy
+        uuid employeeId
+        string status
+        string tokenHash
+        timestamp expiresAt
+        timestamp acceptedAt
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
     EMPLOYEE {
         uuid id
         string employeeId
         uuid companyId
+        uuid userId
+        uuid departmentId
         uuid roleId
+        uuid reportingManagerId
         email email
         date startDate
-        enum employmentType
-        enum gender
-        json documents
+        string employmentType
+        string gender
         number salary
         timestamp createdAt
         timestamp updatedAt
@@ -63,15 +86,17 @@ erDiagram
         uuid companyId
         uuid employeeId
         string name
-        enum documentKind
+        string documentKind
         string dataUrl
-        timestamp uploadedAt
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     DEPARTMENT {
         uuid id
         uuid companyId
         string name
+        string description
         timestamp createdAt
         timestamp updatedAt
     }
@@ -88,8 +113,11 @@ erDiagram
         uuid id
         uuid companyId
         uuid roleId
+        uuid departmentId
         string title
-        enum jobStatus
+        number salaryFrom
+        number salaryTo
+        string jobStatus
         timestamp createdAt
         timestamp updatedAt
     }
@@ -99,7 +127,10 @@ erDiagram
         uuid companyId
         uuid jobId
         email email
-        enum applicantStatus
+        number yearsOfExperience
+        number currentSalary
+        number expectedSalary
+        string applicantStatus
         date appliedDate
         json documents
         timestamp createdAt
@@ -110,7 +141,7 @@ erDiagram
         uuid id
         uuid companyId
         string name
-        enum leaveUnit
+        string leaveUnit
         timestamp createdAt
         timestamp updatedAt
     }
@@ -120,11 +151,30 @@ erDiagram
         uuid companyId
         uuid employeeId
         uuid leaveTypeId
-        date date
-        enum leaveUnit
+        date startDate
+        date endDate
+        string leaveUnit
         number amount
         string note
         json documents
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
+    LEAVE_DAY {
+        uuid id
+        uuid companyId
+        uuid leaveRecordId
+        uuid employeeId
+        uuid leaveTypeId
+        date date
+        string leaveUnit
+        number amount
+        boolean isWorkingDay
+        boolean isHoliday
+        boolean isClosed
+        boolean countsTowardQuota
+        json workingHours
         timestamp createdAt
         timestamp updatedAt
     }
@@ -141,7 +191,7 @@ erDiagram
     FEEDBACK_CARD {
         uuid id
         uuid companyId
-        enum feedbackSubject
+        string feedbackSubject
         string title
         timestamp createdAt
         timestamp updatedAt
@@ -151,8 +201,10 @@ erDiagram
         uuid id
         uuid companyId
         uuid cardId
-        enum feedbackEntryType
-        json subject
+        string feedbackEntryType
+        string subjectType
+        uuid subjectId
+        string subjectName
         timestamp createdAt
         timestamp updatedAt
     }

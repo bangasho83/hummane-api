@@ -12,19 +12,22 @@ export class EmployeesService {
 
     async create(data: Employee): Promise<Employee> {
         const id = data.id || uuidv4();
+        const timestamp = Timestamp.now();
         const newDoc = {
             ...data,
             id,
-            createdAt: Timestamp.now(),
+            createdAt: timestamp,
+            updatedAt: timestamp,
         };
         await this.firestoreService.getCollection(this.collectionName).doc(id).set(newDoc);
         return newDoc;
     }
 
-    async findAll(companyId: string): Promise<Employee[]> {
+    async findAll(companyId: string, limit = 50): Promise<Employee[]> {
         // Strict filtering by companyId
         const snapshot = await this.firestoreService.getCollection(this.collectionName)
             .where('companyId', '==', companyId)
+            .limit(limit)
             .get();
         return snapshot.docs.map(doc => doc.data() as Employee);
     }

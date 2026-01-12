@@ -1,9 +1,11 @@
-import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { CompanyGuard } from '../auth/company.guard';
 import { Department, DepartmentSchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
+import { parseLimit } from '../utils/pagination';
 
 @Injectable()
 export class DepartmentsService {
@@ -17,16 +19,18 @@ export class DepartmentsService {
         }
 
         const id = data.id || uuidv4();
-        const doc = { ...data, id, createdAt: Timestamp.now() };
+        const timestamp = Timestamp.now();
+        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
         console.log(`[DepartmentsService] [SAVE_TRACE] Final Document:`, JSON.stringify(doc));
 
         await this.firestore.getCollection('departments').doc(id).set(doc);
         return doc;
     }
 
-    async findAll(companyId: string) {
+    async findAll(companyId: string, limit = 50) {
         const snap = await this.firestore.getCollection('departments')
             .where('companyId', '==', companyId)
+            .limit(limit)
             .get();
         return snap.docs.map(d => d.data());
     }
@@ -64,17 +68,13 @@ export class DepartmentsService {
 }
 
 @Controller('departments')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, CompanyGuard)
 export class DepartmentsController {
     constructor(private service: DepartmentsService) { }
 
     @Post()
     create(@Body() data: Department, @Req() req) {
         const user = req.user;
-
-        if (!user || !user.companyId) {
-            throw new Error('User does not belong to a company or session is invalid');
-        }
 
         // 1. Force companyId from token
         console.log(`[DepartmentsController] [TRACE] User companyId: ${user.companyId}`);
@@ -83,7 +83,7 @@ export class DepartmentsController {
         // 2. Validate and retrieve clean data
         const v = DepartmentSchema.safeParse(data);
         if (!v.success) {
-            throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
+            throw new BadRequestException(v.error.issues);
         }
 
         // 3. Persist validated data
@@ -91,9 +91,9 @@ export class DepartmentsController {
     }
 
     @Get()
-    findAll(@Req() req) {
+    findAll(@Req() req, @Query('limit') limit?: string) {
         const user = req.user;
-        return this.service.findAll(user.companyId);
+        return this.service.findAll(user.companyId, parseLimit(limit));
     }
 
     @Get(':id')
@@ -103,7 +103,9 @@ export class DepartmentsController {
 
     @Put(':id')
     update(@Param('id') id: string, @Body() data: Partial<Department>, @Req() req) {
-        return this.service.update(id, data, req.user.companyId);
+        const updateData = { ...data };
+        delete (updateData as Partial<Department>).companyId;
+        return this.service.update(id, updateData, req.user.companyId);
     }
 
     @Delete(':id')

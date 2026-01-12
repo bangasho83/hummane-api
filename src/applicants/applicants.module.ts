@@ -1,9 +1,11 @@
-import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { CompanyGuard } from '../auth/company.guard';
 import { Applicant, ApplicantSchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
+import { parseLimit } from '../utils/pagination';
 
 @Injectable()
 export class ApplicantsService {
@@ -11,14 +13,16 @@ export class ApplicantsService {
 
     async create(data: Applicant) {
         const id = data.id || uuidv4();
-        const doc = { ...data, id, createdAt: Timestamp.now() };
+        const timestamp = Timestamp.now();
+        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
         await this.firestore.getCollection('applicants').doc(id).set(doc);
         return doc;
     }
 
-    async findAll(companyId: string) {
+    async findAll(companyId: string, limit = 50) {
         const snap = await this.firestore.getCollection('applicants')
             .where('companyId', '==', companyId)
+            .limit(limit)
             .get();
         return snap.docs.map(d => d.data());
     }
@@ -55,22 +59,20 @@ export class ApplicantsService {
 }
 
 @Controller('applicants')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, CompanyGuard)
 export class ApplicantsController {
     constructor(private service: ApplicantsService) { }
 
     @Post()
     create(@Body() data: Applicant, @Req() req) {
         const user = req.user;
-        if (!user.companyId) throw new Error('User does not belong to a company');
-
         // 1. Force companyId from token
         data.companyId = user.companyId;
 
         // 2. Validate and retrieve clean data
         const v = ApplicantSchema.safeParse(data);
         if (!v.success) {
-            throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
+            throw new BadRequestException(v.error.issues);
         }
 
         // 3. Persist validated data
@@ -78,8 +80,8 @@ export class ApplicantsController {
     }
 
     @Get()
-    findAll(@Req() req) {
-        return this.service.findAll(req.user.companyId);
+    findAll(@Req() req, @Query('limit') limit?: string) {
+        return this.service.findAll(req.user.companyId, parseLimit(limit));
     }
 
     @Get(':id')
@@ -89,7 +91,9 @@ export class ApplicantsController {
 
     @Put(':id')
     update(@Param('id') id: string, @Body() data: Partial<Applicant>, @Req() req) {
-        return this.service.update(id, data, req.user.companyId);
+        const updateData = { ...data };
+        delete (updateData as Partial<Applicant>).companyId;
+        return this.service.update(id, updateData, req.user.companyId);
     }
 
     @Delete(':id')

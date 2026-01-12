@@ -3,25 +3,21 @@ import { z } from 'zod';
 
 const TimestampSchema = z.instanceof(Timestamp);
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const IsoDateRangeSchema = z.union([
-    IsoDateSchema,
-    z.string().regex(/^\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$/),
-]);
 
-// Enums
-export const EmploymentTypeEnum = z.enum(['Contract', 'Full-time', 'Intern', 'Part-time']);
-export const GenderEnum = z.enum(['Male', 'Female', 'Non-binary', 'Prefer not to say']);
-export const JobStatusEnum = z.enum(['open', 'closed']);
-export const FeedbackEntryTypeEnum = z.enum(['interview', 'performance', 'onboarding', 'offboarding', 'general']);
+const TwoDecimalNumberSchema = z.number().refine(
+    (value) => Number.isFinite(value) && Math.round(value * 100) === value * 100,
+    { message: 'Value must have at most 2 decimal places' }
+);
+const OneDecimalNumberSchema = z.number().refine(
+    (value) => Number.isFinite(value) && Math.round(value * 10) === value * 10,
+    { message: 'Value must have at most 1 decimal place' }
+);
 
-const DocumentItemSchema = z.object({
-    name: z.string().min(1),
-    url: z.string().min(1),
-});
-
-const DocumentLinksSchema = z.object({
-    files: z.array(DocumentItemSchema),
-});
+// String fields (enum values documented in documentation/enums.json)
+export const EmploymentTypeEnum = z.string().min(1);
+export const GenderEnum = z.string().min(1);
+export const JobStatusEnum = z.string().min(1);
+export const FeedbackEntryTypeEnum = z.string().min(1);
 
 const DocumentFilesSchema = z.object({
     files: z.array(z.string()),
@@ -31,16 +27,16 @@ export const EmployeeSchema = z.object({
     id: z.string().optional(),
     employeeId: z.string().min(1),
     companyId: z.string().min(1),
+    userId: z.string().optional(),
     name: z.string().min(1),
     email: z.string().email(),
-    department: z.string().optional(),
+    departmentId: z.string().optional(),
     roleId: z.string().optional(),
     startDate: IsoDateSchema,
     employmentType: EmploymentTypeEnum,
-    reportingManager: z.string().optional(),
+    reportingManagerId: z.string().optional(),
     gender: GenderEnum,
-    salary: z.number().optional(),
-    documents: DocumentLinksSchema.optional(),
+    salary: TwoDecimalNumberSchema.optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });
@@ -49,7 +45,7 @@ export const DepartmentSchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
     name: z.string().min(1),
-    desc: z.string().optional(),
+    description: z.string().optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });
@@ -68,10 +64,11 @@ export const JobSchema = z.object({
     companyId: z.string().min(1),
     title: z.string().min(1),
     roleId: z.string().optional(),
-    department: z.string().optional(),
+    departmentId: z.string().optional(),
     employmentType: EmploymentTypeEnum.optional(),
     location: z.string().optional(),
-    salary: z.string().optional(), // Note: schema.json says salary is string/number? User brief says salary. Assuming string (range) or number. Brief says "salary". Let's assume string for range or formatted.
+    salaryFrom: z.number().int().optional(),
+    salaryTo: z.number().int().optional(),
     experience: z.string().optional(),
     status: JobStatusEnum,
     createdAt: TimestampSchema.optional(),
@@ -83,9 +80,16 @@ export type Department = z.infer<typeof DepartmentSchema>;
 export type Role = z.infer<typeof RoleSchema>;
 export type Job = z.infer<typeof JobSchema>;
 
-// Remaining Enums
-export const ApplicantStatusEnum = z.enum(['new', 'screening', 'interview', 'offer', 'rejected', 'hired']);
-export const LeaveUnitEnum = z.enum(['Day', 'Hour']);
+// Status/unit strings
+export const ApplicantStatusEnum = z.string().min(1);
+export const LeaveUnitEnum = z.string().min(1);
+export const WeekdayEnum = z.string().min(1);
+
+const WorkDaySchema = z.object({
+    open: z.boolean(),
+    start: z.string().optional(),
+    end: z.string().optional(),
+});
 
 export const ApplicantSchema = z.object({
     id: z.string().optional(),
@@ -95,9 +99,9 @@ export const ApplicantSchema = z.object({
     email: z.string().email(),
     phone: z.string().optional(),
     positionApplied: z.string().optional(),
-    yearsOfExperience: z.string().or(z.number()).optional(),
-    currentSalary: z.string().or(z.number()).optional(),
-    expectedSalary: z.string().or(z.number()).optional(),
+    yearsOfExperience: OneDecimalNumberSchema.optional(),
+    currentSalary: z.number().int().optional(),
+    expectedSalary: z.number().int().optional(),
     noticePeriod: z.string().optional(),
     resumeFile: z.string().optional(), // URL
     linkedinUrl: z.string().optional(),
@@ -124,12 +128,56 @@ export const LeaveRecordSchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
     employeeId: z.string().min(1),
-    date: IsoDateRangeSchema,
+    startDate: IsoDateSchema,
+    endDate: IsoDateSchema,
     leaveTypeId: z.string().optional(),
-    unit: LeaveUnitEnum.optional(),
-    amount: z.number().optional(),
+    unit: LeaveUnitEnum,
+    amount: TwoDecimalNumberSchema.optional(),
     note: z.string().optional(),
     documents: DocumentFilesSchema.optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
+}).superRefine((data, ctx) => {
+    if (data.startDate > data.endDate) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['startDate'],
+            message: 'startDate must be on or before endDate',
+        });
+    }
+    if (data.unit === 'Hour') {
+        if (data.startDate !== data.endDate) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['endDate'],
+                message: 'Hourly leave must be within a single day',
+            });
+        }
+        if (data.amount === undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['amount'],
+                message: 'Hourly leave requires amount (hours)',
+            });
+        }
+    }
+});
+
+export const LeaveDaySchema = z.object({
+    id: z.string().optional(),
+    leaveRecordId: z.string().min(1),
+    companyId: z.string().min(1),
+    employeeId: z.string().min(1),
+    leaveTypeId: z.string().optional(),
+    date: IsoDateSchema,
+    dayOfWeek: WeekdayEnum,
+    unit: LeaveUnitEnum,
+    amount: TwoDecimalNumberSchema,
+    isWorkingDay: z.boolean(),
+    isHoliday: z.boolean(),
+    isClosed: z.boolean(),
+    countsTowardQuota: z.boolean(),
+    workingHours: WorkDaySchema.optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });
@@ -147,10 +195,11 @@ export type Applicant = z.infer<typeof ApplicantSchema>;
 export type LeaveType = z.infer<typeof LeaveTypeSchema>;
 export type LeaveRecord = z.infer<typeof LeaveRecordSchema>;
 export type Holiday = z.infer<typeof HolidaySchema>;
+export type LeaveDay = z.infer<typeof LeaveDaySchema>;
 
 // Feedback & Documents
-export const FeedbackSubjectEnum = z.enum(['Team Member', 'Applicant']);
-export const DocumentKindEnum = z.enum(['Government ID', 'CV (Curriculum Vitae)', 'Educational Documents', 'Experience Letter', 'Salary Slip', 'Personality Test Report', 'Contract']);
+export const FeedbackSubjectEnum = z.string().min(1);
+export const DocumentKindEnum = z.string().min(1);
 
 export const FeedbackCardSchema = z.object({
     id: z.string().optional(),
@@ -162,25 +211,14 @@ export const FeedbackCardSchema = z.object({
     updatedAt: TimestampSchema.optional(),
 });
 
-const FeedbackEntrySubjectSchema = z.discriminatedUnion('kind', [
-    z.object({
-        kind: z.literal('Employee'),
-        id: z.string().min(1),
-        name: z.string().optional(),
-    }),
-    z.object({
-        kind: z.literal('Applicant'),
-        id: z.string().min(1),
-        name: z.string().optional(),
-    }),
-]);
-
 export const FeedbackEntrySchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
     type: FeedbackEntryTypeEnum.optional(),
     cardId: z.string().min(1),
-    subject: FeedbackEntrySubjectSchema,
+    subjectType: z.string().min(1),
+    subjectId: z.string().min(1),
+    subjectName: z.string().optional(),
     authorId: z.string().optional(),
     authorName: z.string().optional(),
     answers: z.array(z.any()),
@@ -195,7 +233,8 @@ export const EmployeeDocumentSchema = z.object({
     name: z.string().min(1),
     type: DocumentKindEnum,
     dataUrl: z.string().optional(), // Store URL or base64 (better URL)
-    uploadedAt: TimestampSchema.optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
 });
 
 export type FeedbackCard = z.infer<typeof FeedbackCardSchema>;

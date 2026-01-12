@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException, Controller, ForbiddenException, Get, Post, Body, Param, Put, Delete, UseGuards, Req } from '@nestjs/common';
 import { CompaniesService } from './companies.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { Company, CompanySchema } from '../schemas/core.schema';
@@ -18,7 +18,7 @@ export class CompaniesController {
 
         const result = CompanySchema.safeParse(companyData);
         if (!result.success) {
-            throw new Error('Validation failed: ' + JSON.stringify(result.error.issues));
+            throw new BadRequestException(result.error.issues);
         }
 
         console.log(`[CompaniesController] Creating company for owner: ${user.id}`);
@@ -44,7 +44,7 @@ export class CompaniesController {
             // Check if they are owner
             const company = await this.companiesService.findOne(id);
             if (company?.ownerId !== user.id) {
-                return null; // or throw Forbidden
+                throw new ForbiddenException();
             }
             return company;
         }
@@ -59,10 +59,12 @@ export class CompaniesController {
 
         // Only owner or someone in the company can update (though usually only owner)
         if (company.ownerId !== user.id && id !== user.companyId) {
-            throw new Error('Forbidden');
+            throw new ForbiddenException();
         }
 
-        return this.companiesService.update(id, updateData);
+        const sanitized = { ...updateData };
+        delete (sanitized as Partial<Company>).ownerId;
+        return this.companiesService.update(id, sanitized);
     }
 
     @Delete(':id')
@@ -72,7 +74,7 @@ export class CompaniesController {
         if (!company) return;
 
         if (company.ownerId !== user.id) {
-            throw new Error('Forbidden');
+            throw new ForbiddenException();
         }
 
         return this.companiesService.delete(id);

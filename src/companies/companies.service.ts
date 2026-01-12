@@ -12,10 +12,12 @@ export class CompaniesService {
 
     async create(companyData: Company): Promise<Company> {
         const id = companyData.id || uuidv4();
+        const timestamp = Timestamp.now();
         const newCompany = {
             ...companyData,
             id,
-            createdAt: Timestamp.now(),
+            createdAt: timestamp,
+            updatedAt: timestamp,
         };
 
         // 1. Create the company

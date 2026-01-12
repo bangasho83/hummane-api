@@ -1,9 +1,11 @@
-import { Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { Timestamp } from 'firebase-admin/firestore';
 import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
+import { CompanyGuard } from '../auth/company.guard';
 import { Role, RoleSchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
+import { parseLimit } from '../utils/pagination';
 
 @Injectable()
 export class RolesService {
@@ -11,14 +13,16 @@ export class RolesService {
 
     async create(data: Role) {
         const id = data.id || uuidv4();
-        const doc = { ...data, id, createdAt: Timestamp.now() };
+        const timestamp = Timestamp.now();
+        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
         await this.firestore.getCollection('roles').doc(id).set(doc);
         return doc;
     }
 
-    async findAll(companyId: string) {
+    async findAll(companyId: string, limit = 50) {
         const snap = await this.firestore.getCollection('roles')
             .where('companyId', '==', companyId)
+            .limit(limit)
             .get();
         return snap.docs.map(d => d.data());
     }
@@ -55,22 +59,20 @@ export class RolesService {
 }
 
 @Controller('roles')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, CompanyGuard)
 export class RolesController {
     constructor(private service: RolesService) { }
 
     @Post()
     create(@Body() data: Role, @Req() req) {
         const user = req.user;
-        if (!user.companyId) throw new Error('User does not belong to a company');
-
         // 1. Force companyId from token
         data.companyId = user.companyId;
 
         // 2. Validate and retrieve clean data
         const v = RoleSchema.safeParse(data);
         if (!v.success) {
-            throw new Error('Invalid data: ' + JSON.stringify(v.error.issues));
+            throw new BadRequestException(v.error.issues);
         }
 
         // 3. Persist validated data
@@ -78,8 +80,8 @@ export class RolesController {
     }
 
     @Get()
-    findAll(@Req() req) {
-        return this.service.findAll(req.user.companyId);
+    findAll(@Req() req, @Query('limit') limit?: string) {
+        return this.service.findAll(req.user.companyId, parseLimit(limit));
     }
 
     @Get(':id')
@@ -89,7 +91,9 @@ export class RolesController {
 
     @Put(':id')
     update(@Param('id') id: string, @Body() data: Partial<Role>, @Req() req) {
-        return this.service.update(id, data, req.user.companyId);
+        const updateData = { ...data };
+        delete (updateData as Partial<Role>).companyId;
+        return this.service.update(id, updateData, req.user.companyId);
     }
 
     @Delete(':id')
