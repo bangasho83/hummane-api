@@ -215,21 +215,13 @@ export class LeaveRecordsService {
             };
         });
 
-        const workingDayCount = baseDays.filter(day => day.isWorkingDay).length;
-        const totalAmount = record.amount;
+        const totalAmount = record.amount ?? 0;
+        const isHourly = record.unit === 'Hour';
 
         return baseDays.map(day => {
-            let amount = 0;
-            if (record.unit === 'Hour') {
-                amount = day.isWorkingDay ? (totalAmount ?? 0) : 0;
-            } else if (day.isWorkingDay) {
-                if (totalAmount !== undefined) {
-                    amount = workingDayCount ? this.roundToTwoDecimals(totalAmount / workingDayCount) : 0;
-                } else {
-                    amount = 1;
-                }
-            }
-
+            const amount = isHourly
+                ? (day.isWorkingDay ? totalAmount : 0)
+                : (day.isWorkingDay ? 1 : 0);
             return {
                 ...day,
                 amount,
@@ -279,6 +271,14 @@ export class LeaveRecordsService {
         const id = data.id || uuidv4();
         return this.postgres.withTransaction(async (client) => {
             try {
+                const recordInput = { ...data, id };
+                const leaveDays = await this.buildLeaveDays(recordInput, client);
+                const computedAmount = recordInput.unit === 'Day'
+                    ? this.roundToTwoDecimals(
+                        leaveDays.reduce((sum, day) => sum + day.amount, 0),
+                    )
+                    : (recordInput.amount ?? null);
+
                 const result = await client.query<LeaveRecord>(
                     `INSERT INTO leave_records (
                         id,
@@ -295,19 +295,18 @@ export class LeaveRecordsService {
                     RETURNING ${this.selectFields}`,
                     [
                         id,
-                        data.companyId,
-                        data.employeeId,
-                        data.leaveTypeId ?? null,
-                        data.startDate,
-                        data.endDate,
-                        data.unit,
-                        data.amount ?? null,
-                        data.note ?? null,
-                        data.documents ?? null,
+                        recordInput.companyId,
+                        recordInput.employeeId,
+                        recordInput.leaveTypeId ?? null,
+                        recordInput.startDate,
+                        recordInput.endDate,
+                        recordInput.unit,
+                        computedAmount,
+                        recordInput.note ?? null,
+                        recordInput.documents ?? null,
                     ],
                 );
                 const record = result.rows[0];
-                const leaveDays = await this.buildLeaveDays(record, client);
                 await this.writeLeaveDays(leaveDays, client);
                 return record;
             } catch (error) {
@@ -400,13 +399,29 @@ export class LeaveRecordsService {
                     values,
                 );
 
-                const updated = result.rows[0];
+                let updated = result.rows[0];
                 if (!updated) return null;
 
                 if (shouldRebuild) {
                     await this.deleteLeaveDays(id, companyId, client);
                     const leaveDays = await this.buildLeaveDays(updated, client);
                     await this.writeLeaveDays(leaveDays, client);
+
+                    if (updated.unit === 'Day') {
+                        const computedAmount = this.roundToTwoDecimals(
+                            leaveDays.reduce((sum, day) => sum + day.amount, 0),
+                        );
+                        if (computedAmount !== updated.amount) {
+                            const amountResult = await client.query<LeaveRecord>(
+                                `UPDATE leave_records
+                                 SET amount = $1, updated_at = now()
+                                 WHERE id = $2 AND company_id = $3
+                                 RETURNING ${this.selectFields}`,
+                                [computedAmount, id, companyId],
+                            );
+                            updated = amountResult.rows[0] ?? updated;
+                        }
+                    }
                 }
 
                 return updated;

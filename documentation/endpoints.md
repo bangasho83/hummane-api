@@ -266,6 +266,7 @@ If `employeeId`, `companyId`, or `leaveTypeId` does not exist, the API returns 4
 Responses include `leaveDays` for each leave record (explicit per-date entries).
 `leaveDays` only contains per-date fields (no duplicate company/employee/leaveType data).
 `leaveDays` excludes `amount` to avoid confusion; use the parent record for totals.
+For `Day` unit, the API computes `amount` as the total number of working days in the range.
 
 ### GET /leaves
 curl -X GET "$BASE_URL/leaves" \

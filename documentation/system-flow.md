@@ -40,7 +40,8 @@ The API uses Firebase only for authentication and stores all business data in Su
 3) Each day is flagged using company working hours and holidays:
    - `is_working_day`, `is_holiday`, `is_closed`
    - `counts_toward_quota` is true only for working days.
-4) Updates that change date/unit/amount rebuild leave days.
+4) For `Day` unit, the API computes total `amount` as the count of working days.
+5) Updates that change date/unit/amount rebuild leave days.
 
 ## Holidays + Working Hours
 - Company working hours are stored in `companies.working_hours`.
