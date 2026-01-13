@@ -128,6 +128,8 @@ curl -X PUT "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
 curl -X DELETE "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
   -H "Authorization: Bearer $TOKEN"
 
+Employee responses include `departmentName` and `roleName` when those IDs are set.
+
 ## Departments
 ### POST /departments
 curl -X POST "$BASE_URL/departments" \

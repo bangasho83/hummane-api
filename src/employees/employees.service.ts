@@ -8,26 +8,28 @@ export class EmployeesService {
     constructor(private postgres: PostgresService) { }
 
     private selectFields = [
-        'id',
-        'employee_id AS "employeeId"',
-        'company_id AS "companyId"',
-        'user_id AS "userId"',
-        'name',
-        'email',
-        'department_id AS "departmentId"',
-        'role_id AS "roleId"',
-        'start_date AS "startDate"',
-        'employment_type AS "employmentType"',
-        'reporting_manager_id AS "reportingManagerId"',
-        'gender',
-        'salary',
-        'created_at AS "createdAt"',
-        'updated_at AS "updatedAt"',
+        'e.id',
+        'e.employee_id AS "employeeId"',
+        'e.company_id AS "companyId"',
+        'e.user_id AS "userId"',
+        'e.name',
+        'e.email',
+        'e.department_id AS "departmentId"',
+        'd.name AS "departmentName"',
+        'e.role_id AS "roleId"',
+        'r.title AS "roleName"',
+        'e.start_date AS "startDate"',
+        'e.employment_type AS "employmentType"',
+        'e.reporting_manager_id AS "reportingManagerId"',
+        'e.gender',
+        'e.salary',
+        'e.created_at AS "createdAt"',
+        'e.updated_at AS "updatedAt"',
     ].join(', ');
 
     async create(data: Employee): Promise<Employee> {
         const id = data.id || uuidv4();
-        const result = await this.postgres.query<Employee>(
+        await this.postgres.query<{ id: string }>(
             `INSERT INTO employees (
                 id,
                 employee_id,
@@ -43,7 +45,7 @@ export class EmployeesService {
                 gender,
                 salary
             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-            RETURNING ${this.selectFields}`,
+            RETURNING id`,
             [
                 id,
                 data.employeeId,
@@ -60,15 +62,19 @@ export class EmployeesService {
                 data.salary ?? null,
             ],
         );
-        return result.rows[0];
+        return this.findOne(id, data.companyId) as Promise<Employee>;
     }
 
     async findAll(companyId: string, limit = 50): Promise<Employee[]> {
         const result = await this.postgres.query<Employee>(
             `SELECT ${this.selectFields}
-             FROM employees
-             WHERE company_id = $1
-             ORDER BY created_at DESC
+             FROM employees e
+             LEFT JOIN departments d
+               ON d.id = e.department_id AND d.company_id = e.company_id
+             LEFT JOIN roles r
+               ON r.id = e.role_id AND r.company_id = e.company_id
+             WHERE e.company_id = $1
+             ORDER BY e.created_at DESC
              LIMIT $2`,
             [companyId, limit],
         );
@@ -78,8 +84,12 @@ export class EmployeesService {
     async findOne(id: string, companyId: string): Promise<Employee | null> {
         const result = await this.postgres.query<Employee>(
             `SELECT ${this.selectFields}
-             FROM employees
-             WHERE id = $1 AND company_id = $2
+             FROM employees e
+             LEFT JOIN departments d
+               ON d.id = e.department_id AND d.company_id = e.company_id
+             LEFT JOIN roles r
+               ON r.id = e.role_id AND r.company_id = e.company_id
+             WHERE e.id = $1 AND e.company_id = $2
              LIMIT 1`,
             [id, companyId],
         );
@@ -139,14 +149,16 @@ export class EmployeesService {
         updates.push('updated_at = now()');
         values.push(id, companyId);
 
-        const result = await this.postgres.query<Employee>(
+        const result = await this.postgres.query<{ id: string }>(
             `UPDATE employees
              SET ${updates.join(', ')}
              WHERE id = $${index++} AND company_id = $${index}
-             RETURNING ${this.selectFields}`,
+             RETURNING id`,
             values,
         );
-        return result.rows[0] ?? null;
+        const updated = result.rows[0];
+        if (!updated) return null;
+        return this.findOne(id, companyId);
     }
 
     async delete(id: string, companyId: string): Promise<void> {
