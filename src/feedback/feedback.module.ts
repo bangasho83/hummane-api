@@ -1,4 +1,4 @@
-import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { BadRequestException, InternalServerErrorException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { FeedbackCard, FeedbackCardSchema, FeedbackEntry, FeedbackEntrySchema } from '../schemas/hr.schema';
@@ -10,6 +10,17 @@ import { PostgresService } from '../postgres/postgres.service';
 @Injectable()
 export class FeedbackCardsService {
     constructor(private postgres: PostgresService) { }
+
+    private formatErrorDetails(error: unknown) {
+        const pgError = error as { name?: string; code?: string; message?: string; detail?: string; constraint?: string };
+        return {
+            name: pgError?.name,
+            code: pgError?.code,
+            message: pgError?.message,
+            detail: pgError?.detail,
+            constraint: pgError?.constraint,
+        };
+    }
 
     private selectFields = [
         'id',
@@ -23,19 +34,26 @@ export class FeedbackCardsService {
 
     async create(data: FeedbackCard) {
         const id = data.id || uuidv4();
-        const result = await this.postgres.query<FeedbackCard>(
-            `INSERT INTO feedback_cards (id, company_id, title, subject, questions)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING ${this.selectFields}`,
-            [
-                id,
-                data.companyId,
-                data.title,
-                data.subject,
-                data.questions ?? [],
-            ],
-        );
-        return result.rows[0];
+        try {
+            const result = await this.postgres.query<FeedbackCard>(
+                `INSERT INTO feedback_cards (id, company_id, title, subject, questions)
+                 VALUES ($1, $2, $3, $4, $5)
+                 RETURNING ${this.selectFields}`,
+                [
+                    id,
+                    data.companyId,
+                    data.title,
+                    data.subject,
+                    data.questions ?? [],
+                ],
+            );
+            return result.rows[0];
+        } catch (error) {
+            throw new InternalServerErrorException({
+                message: 'Feedback card create failed',
+                error: this.formatErrorDetails(error),
+            });
+        }
     }
     async findAll(companyId: string, limit = 50) {
         const result = await this.postgres.query<FeedbackCard>(
@@ -79,14 +97,21 @@ export class FeedbackCardsService {
         updates.push('updated_at = now()');
         values.push(id, companyId);
 
-        const result = await this.postgres.query<FeedbackCard>(
-            `UPDATE feedback_cards
-             SET ${updates.join(', ')}
-             WHERE id = $${index++} AND company_id = $${index}
-             RETURNING ${this.selectFields}`,
-            values,
-        );
-        return result.rows[0] ?? null;
+        try {
+            const result = await this.postgres.query<FeedbackCard>(
+                `UPDATE feedback_cards
+                 SET ${updates.join(', ')}
+                 WHERE id = $${index++} AND company_id = $${index}
+                 RETURNING ${this.selectFields}`,
+                values,
+            );
+            return result.rows[0] ?? null;
+        } catch (error) {
+            throw new InternalServerErrorException({
+                message: 'Feedback card update failed',
+                error: this.formatErrorDetails(error),
+            });
+        }
     }
     async delete(id: string, companyId: string) {
         await this.postgres.query(
@@ -99,6 +124,17 @@ export class FeedbackCardsService {
 @Injectable()
 export class FeedbackEntriesService {
     constructor(private postgres: PostgresService) { }
+
+    private formatErrorDetails(error: unknown) {
+        const pgError = error as { name?: string; code?: string; message?: string; detail?: string; constraint?: string };
+        return {
+            name: pgError?.name,
+            code: pgError?.code,
+            message: pgError?.message,
+            detail: pgError?.detail,
+            constraint: pgError?.constraint,
+        };
+    }
 
     private selectFields = [
         'id',
@@ -117,34 +153,41 @@ export class FeedbackEntriesService {
 
     async create(data: FeedbackEntry) {
         const id = data.id || uuidv4();
-        const result = await this.postgres.query<FeedbackEntry>(
-            `INSERT INTO feedback_entries (
-                id,
-                company_id,
-                card_id,
-                type,
-                subject_type,
-                subject_id,
-                subject_name,
-                author_id,
-                author_name,
-                answers
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-            RETURNING ${this.selectFields}`,
-            [
-                id,
-                data.companyId,
-                data.cardId,
-                data.type ?? null,
-                data.subjectType,
-                data.subjectId,
-                data.subjectName ?? null,
-                data.authorId ?? null,
-                data.authorName ?? null,
-                data.answers ?? [],
-            ],
-        );
-        return result.rows[0];
+        try {
+            const result = await this.postgres.query<FeedbackEntry>(
+                `INSERT INTO feedback_entries (
+                    id,
+                    company_id,
+                    card_id,
+                    type,
+                    subject_type,
+                    subject_id,
+                    subject_name,
+                    author_id,
+                    author_name,
+                    answers
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                RETURNING ${this.selectFields}`,
+                [
+                    id,
+                    data.companyId,
+                    data.cardId,
+                    data.type ?? null,
+                    data.subjectType,
+                    data.subjectId,
+                    data.subjectName ?? null,
+                    data.authorId ?? null,
+                    data.authorName ?? null,
+                    data.answers ?? [],
+                ],
+            );
+            return result.rows[0];
+        } catch (error) {
+            throw new InternalServerErrorException({
+                message: 'Feedback entry create failed',
+                error: this.formatErrorDetails(error),
+            });
+        }
     }
     async findAll(companyId: string, limit = 50) {
         const result = await this.postgres.query<FeedbackEntry>(
@@ -208,14 +251,21 @@ export class FeedbackEntriesService {
         updates.push('updated_at = now()');
         values.push(id, companyId);
 
-        const result = await this.postgres.query<FeedbackEntry>(
-            `UPDATE feedback_entries
-             SET ${updates.join(', ')}
-             WHERE id = $${index++} AND company_id = $${index}
-             RETURNING ${this.selectFields}`,
-            values,
-        );
-        return result.rows[0] ?? null;
+        try {
+            const result = await this.postgres.query<FeedbackEntry>(
+                `UPDATE feedback_entries
+                 SET ${updates.join(', ')}
+                 WHERE id = $${index++} AND company_id = $${index}
+                 RETURNING ${this.selectFields}`,
+                values,
+            );
+            return result.rows[0] ?? null;
+        } catch (error) {
+            throw new InternalServerErrorException({
+                message: 'Feedback entry update failed',
+                error: this.formatErrorDetails(error),
+            });
+        }
     }
     async delete(id: string, companyId: string) {
         await this.postgres.query(
