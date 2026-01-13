@@ -37,14 +37,14 @@ export class FeedbackCardsService {
         try {
             const result = await this.postgres.query<FeedbackCard>(
                 `INSERT INTO feedback_cards (id, company_id, title, subject, questions)
-                 VALUES ($1, $2, $3, $4, $5)
+                 VALUES ($1, $2, $3, $4, $5::jsonb)
                  RETURNING ${this.selectFields}`,
                 [
                     id,
                     data.companyId,
                     data.title,
                     data.subject,
-                    data.questions ?? [],
+                    JSON.stringify(data.questions ?? []),
                 ],
             );
             return result.rows[0];
@@ -89,10 +89,10 @@ export class FeedbackCardsService {
             updates.push(`subject = $${index++}`);
             values.push(data.subject ?? null);
         }
-        if (Object.prototype.hasOwnProperty.call(data, 'questions')) {
-            updates.push(`questions = $${index++}`);
-            values.push(data.questions ?? []);
-        }
+            if (Object.prototype.hasOwnProperty.call(data, 'questions')) {
+                updates.push(`questions = $${index++}::jsonb`);
+                values.push(JSON.stringify(data.questions ?? []));
+            }
 
         updates.push('updated_at = now()');
         values.push(id, companyId);
@@ -166,7 +166,7 @@ export class FeedbackEntriesService {
                     author_id,
                     author_name,
                     answers
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
                 RETURNING ${this.selectFields}`,
                 [
                     id,
@@ -178,7 +178,7 @@ export class FeedbackEntriesService {
                     data.subjectName ?? null,
                     data.authorId ?? null,
                     data.authorName ?? null,
-                    data.answers ?? [],
+                    JSON.stringify(data.answers ?? []),
                 ],
             );
             return result.rows[0];
@@ -244,8 +244,8 @@ export class FeedbackEntriesService {
             values.push(data.authorName ?? null);
         }
         if (Object.prototype.hasOwnProperty.call(data, 'answers')) {
-            updates.push(`answers = $${index++}`);
-            values.push(data.answers ?? []);
+            updates.push(`answers = $${index++}::jsonb`);
+            values.push(JSON.stringify(data.answers ?? []));
         }
 
         updates.push('updated_at = now()');
