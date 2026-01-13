@@ -76,7 +76,7 @@ export class InvitationsController {
     constructor(private service: InvitationsService) { }
 
     @Post()
-    create(@Body() data: UserInvitation, @Req() req) {
+    async create(@Body() data: UserInvitation, @Req() req) {
         const user = req.user;
         const payload = { ...data };
         payload.companyId = user.companyId;
