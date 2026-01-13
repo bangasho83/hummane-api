@@ -11,6 +11,25 @@ import { PoolClient } from 'pg';
 export class LeaveRecordsService {
     constructor(private postgres: PostgresService) { }
 
+    private leaveDaySelectFields = [
+        'id',
+        'leave_record_id AS "leaveRecordId"',
+        'company_id AS "companyId"',
+        'employee_id AS "employeeId"',
+        'leave_type_id AS "leaveTypeId"',
+        'date',
+        'day_of_week AS "dayOfWeek"',
+        'unit',
+        'amount',
+        'is_working_day AS "isWorkingDay"',
+        'is_holiday AS "isHoliday"',
+        'is_closed AS "isClosed"',
+        'counts_toward_quota AS "countsTowardQuota"',
+        'working_hours AS "workingHours"',
+        'created_at AS "createdAt"',
+        'updated_at AS "updatedAt"',
+    ].join(', ');
+
     private throwIfForeignKeyError(error: unknown) {
         const pgError = error as { code?: string; constraint?: string };
         if (pgError?.code !== '23503') {
@@ -225,6 +244,34 @@ export class LeaveRecordsService {
         });
     }
 
+    private async attachLeaveDays(records: LeaveRecord[]) {
+        if (!records.length) return records;
+        const recordIds = records.map(record => record.id) as string[];
+        const result = await this.postgres.query<LeaveDay>(
+            `SELECT ${this.leaveDaySelectFields}
+             FROM leave_days
+             WHERE company_id = $1 AND leave_record_id = ANY($2)
+             ORDER BY date ASC`,
+            [records[0].companyId, recordIds],
+        );
+
+        const grouped = new Map<string, LeaveDay[]>();
+        result.rows.forEach(day => {
+            const key = day.leaveRecordId as string;
+            const existing = grouped.get(key);
+            if (existing) {
+                existing.push(day);
+            } else {
+                grouped.set(key, [day]);
+            }
+        });
+
+        return records.map(record => ({
+            ...record,
+            leaveDays: grouped.get(record.id as string) ?? [],
+        }));
+    }
+
     async create(data: LeaveRecord) {
         const id = data.id || uuidv4();
         return this.postgres.withTransaction(async (client) => {
@@ -279,7 +326,7 @@ export class LeaveRecordsService {
              LIMIT $2`,
             [companyId, limit],
         );
-        return result.rows;
+        return this.attachLeaveDays(result.rows);
     }
 
     async findOne(id: string, companyId: string) {
@@ -290,7 +337,10 @@ export class LeaveRecordsService {
              LIMIT 1`,
             [id, companyId],
         );
-        return result.rows[0] ?? null;
+        const record = result.rows[0];
+        if (!record) return null;
+        const [withDays] = await this.attachLeaveDays([record]);
+        return withDays;
     }
 
     async update(id: string, data: Partial<LeaveRecord>, companyId: string) {

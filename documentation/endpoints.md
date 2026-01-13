@@ -263,6 +263,7 @@ curl -X POST "$BASE_URL/leaves" \
 Leave days are expanded per calendar date; non-working days/holidays are flagged and do not count toward quota.
 Hourly leave must use the same start/end date and `amount` is hours.
 If `employeeId`, `companyId`, or `leaveTypeId` does not exist, the API returns 400 with a descriptive message.
+Responses include `leaveDays` for each leave record (explicit per-date entries).
 
 ### GET /leaves
 curl -X GET "$BASE_URL/leaves" \
