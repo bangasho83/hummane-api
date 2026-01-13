@@ -11,6 +11,32 @@ import { PoolClient } from 'pg';
 export class LeaveRecordsService {
     constructor(private postgres: PostgresService) { }
 
+    private throwIfForeignKeyError(error: unknown) {
+        const pgError = error as { code?: string; constraint?: string };
+        if (pgError?.code !== '23503') {
+            return;
+        }
+
+        const constraint = pgError.constraint ?? '';
+        const messageByConstraint: Record<string, string> = {
+            leave_records_company_fk: 'companyId does not exist',
+            leave_records_employee_fk: 'employeeId does not exist',
+            leave_records_leave_type_fk: 'leaveTypeId does not exist',
+            leave_days_company_fk: 'companyId does not exist',
+            leave_days_employee_fk: 'employeeId does not exist',
+            leave_days_leave_type_fk: 'leaveTypeId does not exist',
+            leave_days_leave_record_fk: 'leaveRecordId does not exist',
+        };
+
+        throw new BadRequestException({
+            message: messageByConstraint[constraint] ?? 'Foreign key constraint failed',
+            error: {
+                code: pgError.code,
+                constraint,
+            },
+        });
+    }
+
     private selectFields = [
         'id',
         'company_id AS "companyId"',
@@ -186,37 +212,42 @@ export class LeaveRecordsService {
     async create(data: LeaveRecord) {
         const id = data.id || uuidv4();
         return this.postgres.withTransaction(async (client) => {
-            const result = await client.query<LeaveRecord>(
-                `INSERT INTO leave_records (
-                    id,
-                    company_id,
-                    employee_id,
-                    leave_type_id,
-                    start_date,
-                    end_date,
-                    unit,
-                    amount,
-                    note,
-                    documents
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-                RETURNING ${this.selectFields}`,
-                [
-                    id,
-                    data.companyId,
-                    data.employeeId,
-                    data.leaveTypeId ?? null,
-                    data.startDate,
-                    data.endDate,
-                    data.unit,
-                    data.amount ?? null,
-                    data.note ?? null,
-                    data.documents ?? null,
-                ],
-            );
-            const record = result.rows[0];
-            const leaveDays = await this.buildLeaveDays(record, client);
-            await this.writeLeaveDays(leaveDays, client);
-            return record;
+            try {
+                const result = await client.query<LeaveRecord>(
+                    `INSERT INTO leave_records (
+                        id,
+                        company_id,
+                        employee_id,
+                        leave_type_id,
+                        start_date,
+                        end_date,
+                        unit,
+                        amount,
+                        note,
+                        documents
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                    RETURNING ${this.selectFields}`,
+                    [
+                        id,
+                        data.companyId,
+                        data.employeeId,
+                        data.leaveTypeId ?? null,
+                        data.startDate,
+                        data.endDate,
+                        data.unit,
+                        data.amount ?? null,
+                        data.note ?? null,
+                        data.documents ?? null,
+                    ],
+                );
+                const record = result.rows[0];
+                const leaveDays = await this.buildLeaveDays(record, client);
+                await this.writeLeaveDays(leaveDays, client);
+                return record;
+            } catch (error) {
+                this.throwIfForeignKeyError(error);
+                throw error;
+            }
         });
     }
 
@@ -288,24 +319,29 @@ export class LeaveRecordsService {
             updates.push('updated_at = now()');
             values.push(id, companyId);
 
-            const result = await client.query<LeaveRecord>(
-                `UPDATE leave_records
-                 SET ${updates.join(', ')}
-                 WHERE id = $${index++} AND company_id = $${index}
-                 RETURNING ${this.selectFields}`,
-                values,
-            );
+            try {
+                const result = await client.query<LeaveRecord>(
+                    `UPDATE leave_records
+                     SET ${updates.join(', ')}
+                     WHERE id = $${index++} AND company_id = $${index}
+                     RETURNING ${this.selectFields}`,
+                    values,
+                );
 
-            const updated = result.rows[0];
-            if (!updated) return null;
+                const updated = result.rows[0];
+                if (!updated) return null;
 
-            if (shouldRebuild) {
-                await this.deleteLeaveDays(id, companyId, client);
-                const leaveDays = await this.buildLeaveDays(updated, client);
-                await this.writeLeaveDays(leaveDays, client);
+                if (shouldRebuild) {
+                    await this.deleteLeaveDays(id, companyId, client);
+                    const leaveDays = await this.buildLeaveDays(updated, client);
+                    await this.writeLeaveDays(leaveDays, client);
+                }
+
+                return updated;
+            } catch (error) {
+                this.throwIfForeignKeyError(error);
+                throw error;
             }
-
-            return updated;
         });
     }
 
