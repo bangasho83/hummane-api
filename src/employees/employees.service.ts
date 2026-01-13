@@ -7,6 +7,11 @@ import { PostgresService } from '../postgres/postgres.service';
 export class EmployeesService {
     constructor(private postgres: PostgresService) { }
 
+    private normalizeOptionalUuid(value?: string | null) {
+        if (value === '') return null;
+        return value ?? null;
+    }
+
     private selectFields = [
         'e.id',
         'e.employee_id AS "employeeId"',
@@ -107,7 +112,7 @@ export class EmployeesService {
         }
         if (Object.prototype.hasOwnProperty.call(updateData, 'userId')) {
             updates.push(`user_id = $${index++}`);
-            values.push(updateData.userId ?? null);
+            values.push(this.normalizeOptionalUuid(updateData.userId));
         }
         if (updateData.name !== undefined) {
             updates.push(`name = $${index++}`);
@@ -119,11 +124,11 @@ export class EmployeesService {
         }
         if (Object.prototype.hasOwnProperty.call(updateData, 'departmentId')) {
             updates.push(`department_id = $${index++}`);
-            values.push(updateData.departmentId ?? null);
+            values.push(this.normalizeOptionalUuid(updateData.departmentId));
         }
         if (Object.prototype.hasOwnProperty.call(updateData, 'roleId')) {
             updates.push(`role_id = $${index++}`);
-            values.push(updateData.roleId ?? null);
+            values.push(this.normalizeOptionalUuid(updateData.roleId));
         }
         if (updateData.startDate !== undefined) {
             updates.push(`start_date = $${index++}`);
@@ -135,7 +140,7 @@ export class EmployeesService {
         }
         if (Object.prototype.hasOwnProperty.call(updateData, 'reportingManagerId')) {
             updates.push(`reporting_manager_id = $${index++}`);
-            values.push(updateData.reportingManagerId ?? null);
+            values.push(this.normalizeOptionalUuid(updateData.reportingManagerId));
         }
         if (updateData.gender !== undefined) {
             updates.push(`gender = $${index++}`);
