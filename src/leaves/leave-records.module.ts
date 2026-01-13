@@ -1,15 +1,30 @@
 import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
-import { Timestamp } from 'firebase-admin/firestore';
-import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { LeaveDay, LeaveRecord, LeaveRecordSchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { parseLimit } from '../utils/pagination';
+import { PostgresService } from '../postgres/postgres.service';
+import { PoolClient } from 'pg';
 
 @Injectable()
 export class LeaveRecordsService {
-    constructor(private firestore: FirestoreService) { }
+    constructor(private postgres: PostgresService) { }
+
+    private selectFields = [
+        'id',
+        'company_id AS "companyId"',
+        'employee_id AS "employeeId"',
+        'leave_type_id AS "leaveTypeId"',
+        'start_date AS "startDate"',
+        'end_date AS "endDate"',
+        'unit',
+        'amount',
+        'note',
+        'documents',
+        'created_at AS "createdAt"',
+        'updated_at AS "updatedAt"',
+    ].join(', ');
 
     private getDateRange(startDate: string, endDate: string): string[] {
         const dates: string[] = [];
@@ -38,48 +53,90 @@ export class LeaveRecordsService {
         return Math.round(value * 100) / 100;
     }
 
-    private async deleteLeaveDays(leaveRecordId: string) {
-        const leaveDaysCollection = this.firestore.getCollection('leaveDays');
-        const snapshot = await leaveDaysCollection.where('leaveRecordId', '==', leaveRecordId).get();
-        if (snapshot.empty) return;
-
-        const firestore = leaveDaysCollection.firestore;
-        const docs = snapshot.docs;
-        for (let i = 0; i < docs.length; i += 400) {
-            const batch = firestore.batch();
-            docs.slice(i, i + 400).forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
+    private normalizeDate(value: string | Date) {
+        if (value instanceof Date) {
+            return value.toISOString().slice(0, 10);
         }
+        return value;
     }
 
-    private async writeLeaveDays(leaveDays: LeaveDay[]) {
+    private async deleteLeaveDays(leaveRecordId: string, companyId: string, client: PoolClient) {
+        await client.query(
+            `DELETE FROM leave_days WHERE leave_record_id = $1 AND company_id = $2`,
+            [leaveRecordId, companyId],
+        );
+    }
+
+    private async writeLeaveDays(leaveDays: LeaveDay[], client: PoolClient) {
         if (!leaveDays.length) return;
-        const leaveDaysCollection = this.firestore.getCollection('leaveDays');
-        const firestore = leaveDaysCollection.firestore;
-        for (let i = 0; i < leaveDays.length; i += 400) {
-            const batch = firestore.batch();
-            leaveDays.slice(i, i + 400).forEach(day => {
-                const docRef = leaveDaysCollection.doc(day.id || uuidv4());
-                batch.set(docRef, day);
-            });
-            await batch.commit();
-        }
+        const columns = [
+            'id',
+            'leave_record_id',
+            'company_id',
+            'employee_id',
+            'leave_type_id',
+            'date',
+            'day_of_week',
+            'unit',
+            'amount',
+            'is_working_day',
+            'is_holiday',
+            'is_closed',
+            'counts_toward_quota',
+            'working_hours',
+        ];
+
+        const values: unknown[] = [];
+        const rows = leaveDays.map((day, rowIndex) => {
+            const offset = rowIndex * columns.length;
+            values.push(
+                day.id || uuidv4(),
+                day.leaveRecordId,
+                day.companyId,
+                day.employeeId,
+                day.leaveTypeId ?? null,
+                day.date,
+                day.dayOfWeek,
+                day.unit,
+                day.amount,
+                day.isWorkingDay,
+                day.isHoliday,
+                day.isClosed,
+                day.countsTowardQuota,
+                day.workingHours ?? null,
+            );
+            const placeholders = columns.map((_, colIndex) => `$${offset + colIndex + 1}`);
+            return `(${placeholders.join(', ')})`;
+        });
+
+        await client.query(
+            `INSERT INTO leave_days (${columns.join(', ')}) VALUES ${rows.join(', ')}`,
+            values,
+        );
     }
 
-    private async buildLeaveDays(record: LeaveRecord): Promise<LeaveDay[]> {
-        const companyDoc = await this.firestore.getCollection('companies').doc(record.companyId).get();
-        const companyData = companyDoc.exists ? (companyDoc.data() as any) : {};
+    private async buildLeaveDays(record: LeaveRecord, client: PoolClient): Promise<LeaveDay[]> {
+        const companyResult = await client.query<{ workingHours: Record<string, any>; timezone: string }>(
+            `SELECT working_hours AS "workingHours", timezone FROM companies WHERE id = $1 LIMIT 1`,
+            [record.companyId],
+        );
+        const companyData = companyResult.rows[0];
         const workingHours = companyData?.workingHours || null;
         const companyTimeZone = companyData?.timezone;
 
-        const holidaysSnapshot = await this.firestore.getCollection('holidays')
-            .where('companyId', '==', record.companyId)
-            .where('date', '>=', record.startDate)
-            .where('date', '<=', record.endDate)
-            .get();
-        const holidayDates = new Set(holidaysSnapshot.docs.map(doc => (doc.data() as any).date));
+        const startDate = this.normalizeDate(record.startDate as unknown as string | Date);
+        const endDate = this.normalizeDate(record.endDate as unknown as string | Date);
 
-        const dates = this.getDateRange(record.startDate, record.endDate);
+        const holidaysResult = await client.query<{ date: string | Date }>(
+            `SELECT date FROM holidays
+             WHERE company_id = $1 AND date >= $2 AND date <= $3`,
+            [record.companyId, startDate, endDate],
+        );
+        const holidayDates = new Set(
+            holidaysResult.rows.map(row => this.normalizeDate(row.date)),
+        );
+
+        const dates = this.getDateRange(startDate, endDate);
         const baseDays = dates.map(date => {
             const weekdayKey = this.getWeekdayKey(date, companyTimeZone);
             const daySchedule = workingHours ? workingHours[weekdayKey] : null;
@@ -119,72 +176,147 @@ export class LeaveRecordsService {
                 }
             }
 
-            const timestamp = Timestamp.now();
             return {
                 ...day,
                 amount,
-                createdAt: timestamp,
-                updatedAt: timestamp,
             };
         });
     }
 
     async create(data: LeaveRecord) {
         const id = data.id || uuidv4();
-        const timestamp = Timestamp.now();
-        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
-        await this.firestore.getCollection('leaves').doc(id).set(doc);
-        const leaveDays = await this.buildLeaveDays(doc);
-        await this.writeLeaveDays(leaveDays);
-        return doc;
+        return this.postgres.withTransaction(async (client) => {
+            const result = await client.query<LeaveRecord>(
+                `INSERT INTO leave_records (
+                    id,
+                    company_id,
+                    employee_id,
+                    leave_type_id,
+                    start_date,
+                    end_date,
+                    unit,
+                    amount,
+                    note,
+                    documents
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                RETURNING ${this.selectFields}`,
+                [
+                    id,
+                    data.companyId,
+                    data.employeeId,
+                    data.leaveTypeId ?? null,
+                    data.startDate,
+                    data.endDate,
+                    data.unit,
+                    data.amount ?? null,
+                    data.note ?? null,
+                    data.documents ?? null,
+                ],
+            );
+            const record = result.rows[0];
+            const leaveDays = await this.buildLeaveDays(record, client);
+            await this.writeLeaveDays(leaveDays, client);
+            return record;
+        });
     }
 
     async findAll(companyId: string, limit = 50) {
-        const snap = await this.firestore.getCollection('leaves')
-            .where('companyId', '==', companyId)
-            .limit(limit)
-            .get();
-        return snap.docs.map(d => d.data());
+        const result = await this.postgres.query<LeaveRecord>(
+            `SELECT ${this.selectFields}
+             FROM leave_records
+             WHERE company_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2`,
+            [companyId, limit],
+        );
+        return result.rows;
     }
 
     async findOne(id: string, companyId: string) {
-        const doc = await this.firestore.getCollection('leaves').doc(id).get();
-        if (!doc.exists) return null;
-        const data = doc.data() as LeaveRecord;
-        if (data.companyId !== companyId) return null;
-        return data;
+        const result = await this.postgres.query<LeaveRecord>(
+            `SELECT ${this.selectFields}
+             FROM leave_records
+             WHERE id = $1 AND company_id = $2
+             LIMIT 1`,
+            [id, companyId],
+        );
+        return result.rows[0] ?? null;
     }
 
     async update(id: string, data: Partial<LeaveRecord>, companyId: string) {
-        const ref = this.firestore.getCollection('leaves').doc(id);
-        const doc = await ref.get();
-        if (!doc.exists) return null;
-        const currentData = doc.data() as LeaveRecord;
-        if (currentData.companyId !== companyId) return null;
-
-        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
-        const updated = (await ref.get()).data() as LeaveRecord;
-
         const shouldRebuild = ['startDate', 'endDate', 'unit', 'amount', 'employeeId', 'leaveTypeId']
-            .some(field => field in data);
-        if (shouldRebuild) {
-            await this.deleteLeaveDays(id);
-            const leaveDays = await this.buildLeaveDays(updated);
-            await this.writeLeaveDays(leaveDays);
-        }
+            .some(field => Object.prototype.hasOwnProperty.call(data, field));
 
-        return updated;
+        return this.postgres.withTransaction(async (client) => {
+            const updates: string[] = [];
+            const values: unknown[] = [];
+            let index = 1;
+
+            if (Object.prototype.hasOwnProperty.call(data, 'employeeId')) {
+                updates.push(`employee_id = $${index++}`);
+                values.push(data.employeeId ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'leaveTypeId')) {
+                updates.push(`leave_type_id = $${index++}`);
+                values.push(data.leaveTypeId ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'startDate')) {
+                updates.push(`start_date = $${index++}`);
+                values.push(data.startDate ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'endDate')) {
+                updates.push(`end_date = $${index++}`);
+                values.push(data.endDate ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'unit')) {
+                updates.push(`unit = $${index++}`);
+                values.push(data.unit ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'amount')) {
+                updates.push(`amount = $${index++}`);
+                values.push(data.amount ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'note')) {
+                updates.push(`note = $${index++}`);
+                values.push(data.note ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'documents')) {
+                updates.push(`documents = $${index++}`);
+                values.push(data.documents ?? null);
+            }
+
+            updates.push('updated_at = now()');
+            values.push(id, companyId);
+
+            const result = await client.query<LeaveRecord>(
+                `UPDATE leave_records
+                 SET ${updates.join(', ')}
+                 WHERE id = $${index++} AND company_id = $${index}
+                 RETURNING ${this.selectFields}`,
+                values,
+            );
+
+            const updated = result.rows[0];
+            if (!updated) return null;
+
+            if (shouldRebuild) {
+                await this.deleteLeaveDays(id, companyId, client);
+                const leaveDays = await this.buildLeaveDays(updated, client);
+                await this.writeLeaveDays(leaveDays, client);
+            }
+
+            return updated;
+        });
     }
 
     async delete(id: string, companyId: string) {
-        const ref = this.firestore.getCollection('leaves').doc(id);
-        const doc = await ref.get();
-        if (doc.exists) {
-            const data = doc.data() as LeaveRecord;
-            if (data.companyId === companyId) {
-                await ref.delete();
-            }
-        }
+        await this.postgres.withTransaction(async (client) => {
+            await this.deleteLeaveDays(id, companyId, client);
+            await client.query(
+                `DELETE FROM leave_records WHERE id = $1 AND company_id = $2`,
+                [id, companyId],
+            );
+        });
     }
 }
 

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { FirestoreModule } from './firestore/firestore.module';
+import { PostgresModule } from './postgres/postgres.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { CompaniesModule } from './companies/companies.module';
@@ -21,7 +21,7 @@ import { InvitationsModule } from './invitations/invitations.module';
         ConfigModule.forRoot({
             isGlobal: true,
         }),
-        FirestoreModule,
+        PostgresModule,
         AuthModule,
         UsersModule,
         CompaniesModule,

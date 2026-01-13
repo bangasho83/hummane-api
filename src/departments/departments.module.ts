@@ -1,69 +1,94 @@
 import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
-import { Timestamp } from 'firebase-admin/firestore';
-import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { Department, DepartmentSchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { parseLimit } from '../utils/pagination';
+import { PostgresService } from '../postgres/postgres.service';
 
 @Injectable()
 export class DepartmentsService {
-    constructor(private firestore: FirestoreService) { }
+    constructor(private postgres: PostgresService) { }
+
+    private selectFields = [
+        'id',
+        'company_id AS "companyId"',
+        'name',
+        'description',
+        'created_at AS "createdAt"',
+        'updated_at AS "updatedAt"',
+    ].join(', ');
 
     async create(data: Department) {
-        console.log(`[DepartmentsService] [SAVE_TRACE] Checking companyId for:`, data.name);
         if (!data.companyId) {
-            console.error(`[DepartmentsService] [CRITICAL] MISSING COMPANY_ID!`, JSON.stringify(data));
             throw new Error('Internal Error: companyId is missing in service layer');
         }
 
         const id = data.id || uuidv4();
-        const timestamp = Timestamp.now();
-        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
-        console.log(`[DepartmentsService] [SAVE_TRACE] Final Document:`, JSON.stringify(doc));
-
-        await this.firestore.getCollection('departments').doc(id).set(doc);
-        return doc;
+        const result = await this.postgres.query<Department>(
+            `INSERT INTO departments (id, company_id, name, description)
+             VALUES ($1, $2, $3, $4)
+             RETURNING ${this.selectFields}`,
+            [id, data.companyId, data.name, data.description ?? null],
+        );
+        return result.rows[0];
     }
 
     async findAll(companyId: string, limit = 50) {
-        const snap = await this.firestore.getCollection('departments')
-            .where('companyId', '==', companyId)
-            .limit(limit)
-            .get();
-        return snap.docs.map(d => d.data());
+        const result = await this.postgres.query<Department>(
+            `SELECT ${this.selectFields}
+             FROM departments
+             WHERE company_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2`,
+            [companyId, limit],
+        );
+        return result.rows;
     }
 
     async findOne(id: string, companyId: string) {
-        const doc = await this.firestore.getCollection('departments').doc(id).get();
-        if (!doc.exists) return null;
-        const data = doc.data() as Department;
-        if (data.companyId !== companyId) return null;
-        return data;
+        const result = await this.postgres.query<Department>(
+            `SELECT ${this.selectFields}
+             FROM departments
+             WHERE id = $1 AND company_id = $2
+             LIMIT 1`,
+            [id, companyId],
+        );
+        return result.rows[0] ?? null;
     }
 
     async update(id: string, data: Partial<Department>, companyId: string) {
-        const ref = this.firestore.getCollection('departments').doc(id);
-        const doc = await ref.get();
-        if (!doc.exists) return null;
-        const currentData = doc.data() as Department;
-        if (currentData.companyId !== companyId) return null;
+        const updates: string[] = [];
+        const values: unknown[] = [];
+        let index = 1;
 
-        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
-        const updated = await ref.get();
-        return updated.data();
+        if (data.name !== undefined) {
+            updates.push(`name = $${index++}`);
+            values.push(data.name);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'description')) {
+            updates.push(`description = $${index++}`);
+            values.push(data.description ?? null);
+        }
+
+        updates.push('updated_at = now()');
+        values.push(id, companyId);
+
+        const result = await this.postgres.query<Department>(
+            `UPDATE departments
+             SET ${updates.join(', ')}
+             WHERE id = $${index++} AND company_id = $${index}
+             RETURNING ${this.selectFields}`,
+            values,
+        );
+        return result.rows[0] ?? null;
     }
 
     async delete(id: string, companyId: string) {
-        const ref = this.firestore.getCollection('departments').doc(id);
-        const doc = await ref.get();
-        if (doc.exists) {
-            const data = doc.data() as Department;
-            if (data.companyId === companyId) {
-                await ref.delete();
-            }
-        }
+        await this.postgres.query(
+            `DELETE FROM departments WHERE id = $1 AND company_id = $2`,
+            [id, companyId],
+        );
     }
 }
 

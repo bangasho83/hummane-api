@@ -48,7 +48,7 @@ curl -X DELETE "$BASE_URL/users/YOUR_USER_ID" \
 
 Invite flow (single-company users):
 1) Create an employee record with the user's email.
-2) Create an invite via `POST /invitations` (stores the invite + sends Firebase link).
+2) Create an invite via `POST /invitations` (stores the invite + sends invite link).
 3) When the user accepts and logs in, link `employees.userId` and let them complete their profile.
 
 ## Invitations

@@ -1,70 +1,130 @@
 import { Injectable } from '@nestjs/common';
-import { Timestamp } from 'firebase-admin/firestore';
-import { FirestoreService } from '../firestore/firestore.service';
 import { Company, CompanySchema } from '../schemas/core.schema';
 import { v4 as uuidv4 } from 'uuid';
+import { PostgresService } from '../postgres/postgres.service';
 
 @Injectable()
 export class CompaniesService {
-    private collectionName = 'companies';
+    constructor(private postgres: PostgresService) { }
 
-    constructor(private firestoreService: FirestoreService) { }
+    private selectFields = [
+        'id',
+        'owner_id AS "ownerId"',
+        'name',
+        'industry',
+        'size',
+        'currency',
+        'timezone',
+        'working_hours AS "workingHours"',
+        'created_at AS "createdAt"',
+        'updated_at AS "updatedAt"',
+    ].join(', ');
 
     async create(companyData: Company): Promise<Company> {
         const id = companyData.id || uuidv4();
-        const timestamp = Timestamp.now();
-        const newCompany = {
-            ...companyData,
-            id,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
+        const result = await this.postgres.withTransaction(async (client) => {
+            const insert = await client.query<Company>(
+                `INSERT INTO companies (id, owner_id, name, industry, size, currency, timezone, working_hours)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 RETURNING ${this.selectFields}`,
+                [
+                    id,
+                    companyData.ownerId,
+                    companyData.name,
+                    companyData.industry ?? null,
+                    companyData.size ?? null,
+                    companyData.currency ?? null,
+                    companyData.timezone ?? null,
+                    companyData.workingHours ?? null,
+                ],
+            );
 
-        // 1. Create the company
-        await this.firestoreService.getCollection(this.collectionName).doc(id).set(newCompany);
+            if (companyData.ownerId) {
+                console.log(`[CompaniesInfo] Linking owner ${companyData.ownerId} to new company ${id}`);
+                await client.query(
+                    `UPDATE users SET company_id = $1, updated_at = now() WHERE id = $2`,
+                    [id, companyData.ownerId],
+                );
+            }
 
-        // 2. Link the owner to this company if ownerId exists
-        if (newCompany.ownerId) {
-            console.log(`[CompaniesInfo] Linking owner ${newCompany.ownerId} to new company ${id}`);
-            await this.firestoreService.getCollection('users').doc(newCompany.ownerId).set({
-                companyId: id
-            }, { merge: true });
-        }
+            return insert.rows[0];
+        });
 
-        return newCompany;
+        return result;
     }
 
     async findAll(): Promise<Company[]> {
-        const snapshot = await this.firestoreService.getCollection(this.collectionName).get();
-        return snapshot.docs.map(doc => doc.data() as Company);
+        const result = await this.postgres.query<Company>(
+            `SELECT ${this.selectFields} FROM companies ORDER BY created_at DESC`,
+        );
+        return result.rows;
     }
 
     async findOne(id: string): Promise<Company | null> {
-        const doc = await this.firestoreService.getCollection(this.collectionName).doc(id).get();
-        if (!doc.exists) return null;
-        return doc.data() as Company;
+        const result = await this.postgres.query<Company>(
+            `SELECT ${this.selectFields} FROM companies WHERE id = $1 LIMIT 1`,
+            [id],
+        );
+        return result.rows[0] ?? null;
     }
 
     async update(id: string, updateData: Partial<Company>): Promise<Company | null> {
-        const docRef = this.firestoreService.getCollection(this.collectionName).doc(id);
-        const doc = await docRef.get();
-        if (!doc.exists) return null;
+        const updates: string[] = [];
+        const values: unknown[] = [];
+        let index = 1;
 
-        const updatedCompany = { ...doc.data(), ...updateData, updatedAt: Timestamp.now() };
-        await docRef.set(updatedCompany, { merge: true });
-        return updatedCompany as Company;
+        if (updateData.name !== undefined) {
+            updates.push(`name = $${index++}`);
+            values.push(updateData.name);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'ownerId')) {
+            updates.push(`owner_id = $${index++}`);
+            values.push(updateData.ownerId ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'industry')) {
+            updates.push(`industry = $${index++}`);
+            values.push(updateData.industry ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'size')) {
+            updates.push(`size = $${index++}`);
+            values.push(updateData.size ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'currency')) {
+            updates.push(`currency = $${index++}`);
+            values.push(updateData.currency ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'timezone')) {
+            updates.push(`timezone = $${index++}`);
+            values.push(updateData.timezone ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'workingHours')) {
+            updates.push(`working_hours = $${index++}`);
+            values.push(updateData.workingHours ?? null);
+        }
+
+        updates.push('updated_at = now()');
+        values.push(id);
+
+        const result = await this.postgres.query<Company>(
+            `UPDATE companies
+             SET ${updates.join(', ')}
+             WHERE id = $${index}
+             RETURNING ${this.selectFields}`,
+            values,
+        );
+
+        return result.rows[0] ?? null;
     }
 
     async delete(id: string): Promise<void> {
-        await this.firestoreService.getCollection(this.collectionName).doc(id).delete();
+        await this.postgres.query(`DELETE FROM companies WHERE id = $1`, [id]);
     }
 
     async findByOwner(userId: string): Promise<Company | null> {
-        const snapshot = await this.firestoreService.getCollection(this.collectionName)
-            .where('ownerId', '==', userId)
-            .limit(1)
-            .get();
-        if (snapshot.empty) return null;
-        return snapshot.docs[0].data() as Company;
+        const result = await this.postgres.query<Company>(
+            `SELECT ${this.selectFields} FROM companies WHERE owner_id = $1 LIMIT 1`,
+            [userId],
+        );
+        return result.rows[0] ?? null;
     }
 }

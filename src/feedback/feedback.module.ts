@@ -1,102 +1,227 @@
 import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
-import { Timestamp } from 'firebase-admin/firestore';
-import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { FeedbackCard, FeedbackCardSchema, FeedbackEntry, FeedbackEntrySchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { parseLimit } from '../utils/pagination';
+import { PostgresService } from '../postgres/postgres.service';
 
 // Services
 @Injectable()
 export class FeedbackCardsService {
-    constructor(private firestore: FirestoreService) { }
+    constructor(private postgres: PostgresService) { }
+
+    private selectFields = [
+        'id',
+        'company_id AS "companyId"',
+        'title',
+        'subject',
+        'questions',
+        'created_at AS "createdAt"',
+        'updated_at AS "updatedAt"',
+    ].join(', ');
+
     async create(data: FeedbackCard) {
         const id = data.id || uuidv4();
-        const timestamp = Timestamp.now();
-        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
-        await this.firestore.getCollection('feedbackCards').doc(id).set(doc);
-        return doc;
+        const result = await this.postgres.query<FeedbackCard>(
+            `INSERT INTO feedback_cards (id, company_id, title, subject, questions)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING ${this.selectFields}`,
+            [
+                id,
+                data.companyId,
+                data.title,
+                data.subject,
+                data.questions ?? [],
+            ],
+        );
+        return result.rows[0];
     }
     async findAll(companyId: string, limit = 50) {
-        const snap = await this.firestore.getCollection('feedbackCards')
-            .where('companyId', '==', companyId)
-            .limit(limit)
-            .get();
-        return snap.docs.map(d => d.data());
+        const result = await this.postgres.query<FeedbackCard>(
+            `SELECT ${this.selectFields}
+             FROM feedback_cards
+             WHERE company_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2`,
+            [companyId, limit],
+        );
+        return result.rows;
     }
     async findOne(id: string, companyId: string) {
-        const d = await this.firestore.getCollection('feedbackCards').doc(id).get();
-        if (!d.exists) return null;
-        const data = d.data() as FeedbackCard;
-        if (data.companyId !== companyId) return null;
-        return data;
+        const result = await this.postgres.query<FeedbackCard>(
+            `SELECT ${this.selectFields}
+             FROM feedback_cards
+             WHERE id = $1 AND company_id = $2
+             LIMIT 1`,
+            [id, companyId],
+        );
+        return result.rows[0] ?? null;
     }
     async update(id: string, data: Partial<FeedbackCard>, companyId: string) {
-        const ref = this.firestore.getCollection('feedbackCards').doc(id);
-        const doc = await ref.get();
-        if (!doc.exists) return null;
-        const currentData = doc.data() as FeedbackCard;
-        if (currentData.companyId !== companyId) return null;
+        const updates: string[] = [];
+        const values: unknown[] = [];
+        let index = 1;
 
-        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
-        return this.findOne(id, companyId);
+        if (data.title !== undefined) {
+            updates.push(`title = $${index++}`);
+            values.push(data.title);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'subject')) {
+            updates.push(`subject = $${index++}`);
+            values.push(data.subject ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'questions')) {
+            updates.push(`questions = $${index++}`);
+            values.push(data.questions ?? []);
+        }
+
+        updates.push('updated_at = now()');
+        values.push(id, companyId);
+
+        const result = await this.postgres.query<FeedbackCard>(
+            `UPDATE feedback_cards
+             SET ${updates.join(', ')}
+             WHERE id = $${index++} AND company_id = $${index}
+             RETURNING ${this.selectFields}`,
+            values,
+        );
+        return result.rows[0] ?? null;
     }
     async delete(id: string, companyId: string) {
-        const ref = this.firestore.getCollection('feedbackCards').doc(id);
-        const doc = await ref.get();
-        if (doc.exists) {
-            const data = doc.data() as FeedbackCard;
-            if (data.companyId === companyId) {
-                await ref.delete();
-            }
-        }
+        await this.postgres.query(
+            `DELETE FROM feedback_cards WHERE id = $1 AND company_id = $2`,
+            [id, companyId],
+        );
     }
 }
 
 @Injectable()
 export class FeedbackEntriesService {
-    constructor(private firestore: FirestoreService) { }
+    constructor(private postgres: PostgresService) { }
+
+    private selectFields = [
+        'id',
+        'company_id AS "companyId"',
+        'card_id AS "cardId"',
+        'type',
+        'subject_type AS "subjectType"',
+        'subject_id AS "subjectId"',
+        'subject_name AS "subjectName"',
+        'author_id AS "authorId"',
+        'author_name AS "authorName"',
+        'answers',
+        'created_at AS "createdAt"',
+        'updated_at AS "updatedAt"',
+    ].join(', ');
+
     async create(data: FeedbackEntry) {
         const id = data.id || uuidv4();
-        const timestamp = Timestamp.now();
-        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
-        await this.firestore.getCollection('feedbackEntries').doc(id).set(doc);
-        return doc;
+        const result = await this.postgres.query<FeedbackEntry>(
+            `INSERT INTO feedback_entries (
+                id,
+                company_id,
+                card_id,
+                type,
+                subject_type,
+                subject_id,
+                subject_name,
+                author_id,
+                author_name,
+                answers
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+            RETURNING ${this.selectFields}`,
+            [
+                id,
+                data.companyId,
+                data.cardId,
+                data.type ?? null,
+                data.subjectType,
+                data.subjectId,
+                data.subjectName ?? null,
+                data.authorId ?? null,
+                data.authorName ?? null,
+                data.answers ?? [],
+            ],
+        );
+        return result.rows[0];
     }
     async findAll(companyId: string, limit = 50) {
-        const snap = await this.firestore.getCollection('feedbackEntries')
-            .where('companyId', '==', companyId)
-            .limit(limit)
-            .get();
-        return snap.docs.map(d => d.data());
+        const result = await this.postgres.query<FeedbackEntry>(
+            `SELECT ${this.selectFields}
+             FROM feedback_entries
+             WHERE company_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2`,
+            [companyId, limit],
+        );
+        return result.rows;
     }
     async findOne(id: string, companyId: string) {
-        const d = await this.firestore.getCollection('feedbackEntries').doc(id).get();
-        if (!d.exists) return null;
-        const data = d.data() as FeedbackEntry;
-        if (data.companyId !== companyId) return null;
-        return data;
+        const result = await this.postgres.query<FeedbackEntry>(
+            `SELECT ${this.selectFields}
+             FROM feedback_entries
+             WHERE id = $1 AND company_id = $2
+             LIMIT 1`,
+            [id, companyId],
+        );
+        return result.rows[0] ?? null;
     }
     async update(id: string, data: Partial<FeedbackEntry>, companyId: string) {
-        const ref = this.firestore.getCollection('feedbackEntries').doc(id);
-        const doc = await ref.get();
-        if (!doc.exists) return null;
-        const currentData = doc.data() as FeedbackEntry;
-        if (currentData.companyId !== companyId) return null;
+        const updates: string[] = [];
+        const values: unknown[] = [];
+        let index = 1;
 
-        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
-        return this.findOne(id, companyId);
+        if (Object.prototype.hasOwnProperty.call(data, 'cardId')) {
+            updates.push(`card_id = $${index++}`);
+            values.push(data.cardId ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'type')) {
+            updates.push(`type = $${index++}`);
+            values.push(data.type ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'subjectType')) {
+            updates.push(`subject_type = $${index++}`);
+            values.push(data.subjectType ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'subjectId')) {
+            updates.push(`subject_id = $${index++}`);
+            values.push(data.subjectId ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'subjectName')) {
+            updates.push(`subject_name = $${index++}`);
+            values.push(data.subjectName ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'authorId')) {
+            updates.push(`author_id = $${index++}`);
+            values.push(data.authorId ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'authorName')) {
+            updates.push(`author_name = $${index++}`);
+            values.push(data.authorName ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'answers')) {
+            updates.push(`answers = $${index++}`);
+            values.push(data.answers ?? []);
+        }
+
+        updates.push('updated_at = now()');
+        values.push(id, companyId);
+
+        const result = await this.postgres.query<FeedbackEntry>(
+            `UPDATE feedback_entries
+             SET ${updates.join(', ')}
+             WHERE id = $${index++} AND company_id = $${index}
+             RETURNING ${this.selectFields}`,
+            values,
+        );
+        return result.rows[0] ?? null;
     }
     async delete(id: string, companyId: string) {
-        const ref = this.firestore.getCollection('feedbackEntries').doc(id);
-        const doc = await ref.get();
-        if (doc.exists) {
-            const data = doc.data() as FeedbackEntry;
-            if (data.companyId === companyId) {
-                await ref.delete();
-            }
-        }
+        await this.postgres.query(
+            `DELETE FROM feedback_entries WHERE id = $1 AND company_id = $2`,
+            [id, companyId],
+        );
     }
 }
 

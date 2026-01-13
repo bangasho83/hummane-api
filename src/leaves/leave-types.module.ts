@@ -1,60 +1,113 @@
 import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
-import { Timestamp } from 'firebase-admin/firestore';
-import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { LeaveType, LeaveTypeSchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { parseLimit } from '../utils/pagination';
+import { PostgresService } from '../postgres/postgres.service';
 
 @Injectable()
 export class LeaveTypesService {
-    constructor(private firestore: FirestoreService) { }
+    constructor(private postgres: PostgresService) { }
+
+    private selectFields = [
+        'id',
+        'company_id AS "companyId"',
+        'name',
+        'code',
+        'unit',
+        'quota',
+        'employment_type AS "employmentType"',
+        'created_at AS "createdAt"',
+        'updated_at AS "updatedAt"',
+    ].join(', ');
 
     async create(data: LeaveType) {
         const id = data.id || uuidv4();
-        const timestamp = Timestamp.now();
-        const doc = { ...data, id, createdAt: timestamp, updatedAt: timestamp };
-        await this.firestore.getCollection('leaveTypes').doc(id).set(doc);
-        return doc;
+        const result = await this.postgres.query<LeaveType>(
+            `INSERT INTO leave_types (id, company_id, name, code, unit, quota, employment_type)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)
+             RETURNING ${this.selectFields}`,
+            [
+                id,
+                data.companyId,
+                data.name,
+                data.code ?? null,
+                data.unit,
+                data.quota,
+                data.employmentType ?? null,
+            ],
+        );
+        return result.rows[0];
     }
 
     async findAll(companyId: string, limit = 50) {
-        const snap = await this.firestore.getCollection('leaveTypes')
-            .where('companyId', '==', companyId)
-            .limit(limit)
-            .get();
-        return snap.docs.map(d => d.data());
+        const result = await this.postgres.query<LeaveType>(
+            `SELECT ${this.selectFields}
+             FROM leave_types
+             WHERE company_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2`,
+            [companyId, limit],
+        );
+        return result.rows;
     }
 
     async findOne(id: string, companyId: string) {
-        const doc = await this.firestore.getCollection('leaveTypes').doc(id).get();
-        if (!doc.exists) return null;
-        const data = doc.data() as LeaveType;
-        if (data.companyId !== companyId) return null;
-        return data;
+        const result = await this.postgres.query<LeaveType>(
+            `SELECT ${this.selectFields}
+             FROM leave_types
+             WHERE id = $1 AND company_id = $2
+             LIMIT 1`,
+            [id, companyId],
+        );
+        return result.rows[0] ?? null;
     }
 
     async update(id: string, data: Partial<LeaveType>, companyId: string) {
-        const ref = this.firestore.getCollection('leaveTypes').doc(id);
-        const doc = await ref.get();
-        if (!doc.exists) return null;
-        const currentData = doc.data() as LeaveType;
-        if (currentData.companyId !== companyId) return null;
+        const updates: string[] = [];
+        const values: unknown[] = [];
+        let index = 1;
 
-        await ref.set({ ...data, updatedAt: Timestamp.now() }, { merge: true });
-        return (await ref.get()).data();
+        if (data.name !== undefined) {
+            updates.push(`name = $${index++}`);
+            values.push(data.name);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'code')) {
+            updates.push(`code = $${index++}`);
+            values.push(data.code ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'unit')) {
+            updates.push(`unit = $${index++}`);
+            values.push(data.unit ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'quota')) {
+            updates.push(`quota = $${index++}`);
+            values.push(data.quota ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'employmentType')) {
+            updates.push(`employment_type = $${index++}`);
+            values.push(data.employmentType ?? null);
+        }
+
+        updates.push('updated_at = now()');
+        values.push(id, companyId);
+
+        const result = await this.postgres.query<LeaveType>(
+            `UPDATE leave_types
+             SET ${updates.join(', ')}
+             WHERE id = $${index++} AND company_id = $${index}
+             RETURNING ${this.selectFields}`,
+            values,
+        );
+        return result.rows[0] ?? null;
     }
 
     async delete(id: string, companyId: string) {
-        const ref = this.firestore.getCollection('leaveTypes').doc(id);
-        const doc = await ref.get();
-        if (doc.exists) {
-            const data = doc.data() as LeaveType;
-            if (data.companyId === companyId) {
-                await ref.delete();
-            }
-        }
+        await this.postgres.query(
+            `DELETE FROM leave_types WHERE id = $1 AND company_id = $2`,
+            [id, companyId],
+        );
     }
 }
 

@@ -1,7 +1,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
-const TimestampSchema = z.instanceof(Timestamp);
+const TimestampSchema = z.union([z.instanceof(Timestamp), z.date(), z.string()]);
 
 export const UserSchema = z.object({
     id: z.string().optional(), // generated on server

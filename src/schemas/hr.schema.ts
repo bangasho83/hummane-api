@@ -1,7 +1,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
 
-const TimestampSchema = z.instanceof(Timestamp);
+const TimestampSchema = z.union([z.instanceof(Timestamp), z.date(), z.string()]);
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const TwoDecimalNumberSchema = z.number().refine(

@@ -1,18 +1,39 @@
 import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
-import { Timestamp } from 'firebase-admin/firestore';
-import { FirestoreService } from '../firestore/firestore.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { UserInvitation, UserInvitationSchema } from '../schemas/core.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { parseLimit } from '../utils/pagination';
 import { createHash, randomBytes } from 'crypto';
+import { PostgresService } from '../postgres/postgres.service';
 
 @Injectable()
 export class InvitationsService {
-    private collectionName = 'user_invitations';
+    constructor(private postgres: PostgresService) { }
 
-    constructor(private firestore: FirestoreService) { }
+    private selectFields = [
+        'id',
+        'company_id AS "companyId"',
+        'email',
+        'invited_by AS "invitedBy"',
+        'employee_id AS "employeeId"',
+        'status',
+        'token_hash AS "tokenHash"',
+        'expires_at AS "expiresAt"',
+        'accepted_at AS "acceptedAt"',
+        'created_at AS "createdAt"',
+        'updated_at AS "updatedAt"',
+    ].join(', ');
+
+    private toTimestampValue(value?: unknown) {
+        if (!value) return null;
+        if (value instanceof Date) return value;
+        if (typeof value === 'string') return value;
+        if (typeof (value as { toDate?: () => Date }).toDate === 'function') {
+            return (value as { toDate: () => Date }).toDate();
+        }
+        return value;
+    }
 
     private sanitize(invitation: UserInvitation) {
         const { tokenHash, ...rest } = invitation as UserInvitation & { tokenHash?: string };
@@ -21,52 +42,116 @@ export class InvitationsService {
 
     async create(data: UserInvitation, rawToken: string | null) {
         const id = data.id || uuidv4();
-        const timestamp = Timestamp.now();
         const tokenHash = rawToken ? createHash('sha256').update(rawToken).digest('hex') : undefined;
-        const doc = { ...data, id, tokenHash, createdAt: timestamp, updatedAt: timestamp };
-
-        await this.firestore.getCollection(this.collectionName).doc(id).set(doc);
-        return this.sanitize(doc);
+        const result = await this.postgres.query<UserInvitation>(
+            `INSERT INTO user_invitations (
+                id,
+                company_id,
+                email,
+                invited_by,
+                employee_id,
+                status,
+                token_hash,
+                expires_at,
+                accepted_at
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+            RETURNING ${this.selectFields}`,
+            [
+                id,
+                data.companyId,
+                data.email,
+                data.invitedBy,
+                data.employeeId ?? null,
+                data.status ?? 'pending',
+                tokenHash ?? null,
+                this.toTimestampValue(data.expiresAt),
+                this.toTimestampValue(data.acceptedAt),
+            ],
+        );
+        return this.sanitize(result.rows[0] as UserInvitation);
     }
 
     async findAll(companyId: string, status?: string, email?: string, limit = 50) {
-        let query: FirebaseFirestore.Query = this.firestore.getCollection(this.collectionName)
-            .where('companyId', '==', companyId);
-        if (status) query = query.where('status', '==', status);
-        if (email) query = query.where('email', '==', email);
-        const snap = await query.limit(limit).get();
-        return snap.docs.map(d => this.sanitize(d.data() as UserInvitation));
+        const params: unknown[] = [companyId];
+        const clauses: string[] = ['company_id = $1'];
+        if (status) {
+            params.push(status);
+            clauses.push(`status = $${params.length}`);
+        }
+        if (email) {
+            params.push(email);
+            clauses.push(`email = $${params.length}`);
+        }
+        params.push(limit);
+        const limitParam = `$${params.length}`;
+        const result = await this.postgres.query<UserInvitation>(
+            `SELECT ${this.selectFields}
+             FROM user_invitations
+             WHERE ${clauses.join(' AND ')}
+             ORDER BY created_at DESC
+             LIMIT ${limitParam}`,
+            params,
+        );
+        return result.rows.map(row => this.sanitize(row));
     }
 
     async findOne(id: string, companyId: string) {
-        const doc = await this.firestore.getCollection(this.collectionName).doc(id).get();
-        if (!doc.exists) return null;
-        const data = doc.data() as UserInvitation;
-        if (data.companyId !== companyId) return null;
-        return this.sanitize(data);
+        const result = await this.postgres.query<UserInvitation>(
+            `SELECT ${this.selectFields}
+             FROM user_invitations
+             WHERE id = $1 AND company_id = $2
+             LIMIT 1`,
+            [id, companyId],
+        );
+        const row = result.rows[0];
+        return row ? this.sanitize(row) : null;
     }
 
     async update(id: string, data: Partial<UserInvitation>, companyId: string) {
-        const ref = this.firestore.getCollection(this.collectionName).doc(id);
-        const doc = await ref.get();
-        if (!doc.exists) return null;
-        const current = doc.data() as UserInvitation;
-        if (current.companyId !== companyId) return null;
+        const updates: string[] = [];
+        const values: unknown[] = [];
+        let index = 1;
 
-        const updated = { ...current, ...data, updatedAt: Timestamp.now() };
-        await ref.set(updated, { merge: true });
-        return this.sanitize(updated as UserInvitation);
+        if (Object.prototype.hasOwnProperty.call(data, 'email')) {
+            updates.push(`email = $${index++}`);
+            values.push(data.email ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'employeeId')) {
+            updates.push(`employee_id = $${index++}`);
+            values.push(data.employeeId ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'status')) {
+            updates.push(`status = $${index++}`);
+            values.push(data.status ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'expiresAt')) {
+            updates.push(`expires_at = $${index++}`);
+            values.push(this.toTimestampValue(data.expiresAt));
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'acceptedAt')) {
+            updates.push(`accepted_at = $${index++}`);
+            values.push(this.toTimestampValue(data.acceptedAt));
+        }
+
+        updates.push('updated_at = now()');
+        values.push(id, companyId);
+
+        const result = await this.postgres.query<UserInvitation>(
+            `UPDATE user_invitations
+             SET ${updates.join(', ')}
+             WHERE id = $${index++} AND company_id = $${index}
+             RETURNING ${this.selectFields}`,
+            values,
+        );
+        const row = result.rows[0];
+        return row ? this.sanitize(row) : null;
     }
 
     async delete(id: string, companyId: string) {
-        const ref = this.firestore.getCollection(this.collectionName).doc(id);
-        const doc = await ref.get();
-        if (doc.exists) {
-            const data = doc.data() as UserInvitation;
-            if (data.companyId === companyId) {
-                await ref.delete();
-            }
-        }
+        await this.postgres.query(
+            `DELETE FROM user_invitations WHERE id = $1 AND company_id = $2`,
+            [id, companyId],
+        );
     }
 }
 
@@ -88,7 +173,7 @@ export class InvitationsController {
             if (Number.isNaN(date.getTime())) {
                 throw new BadRequestException('expiresAt must be a valid ISO date string');
             }
-            (payload as { expiresAt: Timestamp }).expiresAt = Timestamp.fromDate(date);
+            (payload as { expiresAt: Date }).expiresAt = date;
         }
 
         const result = UserInvitationSchema.safeParse(payload);
@@ -123,14 +208,14 @@ export class InvitationsController {
             if (Number.isNaN(date.getTime())) {
                 throw new BadRequestException('expiresAt must be a valid ISO date string');
             }
-            (updateData as { expiresAt: Timestamp }).expiresAt = Timestamp.fromDate(date);
+            (updateData as { expiresAt: Date }).expiresAt = date;
         }
         if (typeof (updateData as { acceptedAt?: unknown }).acceptedAt === 'string') {
             const date = new Date((updateData as { acceptedAt: string }).acceptedAt);
             if (Number.isNaN(date.getTime())) {
                 throw new BadRequestException('acceptedAt must be a valid ISO date string');
             }
-            (updateData as { acceptedAt: Timestamp }).acceptedAt = Timestamp.fromDate(date);
+            (updateData as { acceptedAt: Date }).acceptedAt = date;
         }
 
         return this.service.update(id, updateData, req.user.companyId);
