@@ -14,20 +14,14 @@ export class LeaveRecordsService {
     private leaveDaySelectFields = [
         'id',
         'leave_record_id AS "leaveRecordId"',
-        'company_id AS "companyId"',
-        'employee_id AS "employeeId"',
-        'leave_type_id AS "leaveTypeId"',
         'date',
         'day_of_week AS "dayOfWeek"',
-        'unit',
         'amount',
         'is_working_day AS "isWorkingDay"',
         'is_holiday AS "isHoliday"',
         'is_closed AS "isClosed"',
         'counts_toward_quota AS "countsTowardQuota"',
         'working_hours AS "workingHours"',
-        'created_at AS "createdAt"',
-        'updated_at AS "updatedAt"',
     ].join(', ');
 
     private throwIfForeignKeyError(error: unknown) {
@@ -258,11 +252,22 @@ export class LeaveRecordsService {
         const grouped = new Map<string, LeaveDay[]>();
         result.rows.forEach(day => {
             const key = day.leaveRecordId as string;
+            const compactDay = {
+                id: day.id,
+                date: day.date,
+                dayOfWeek: day.dayOfWeek,
+                amount: day.amount,
+                isWorkingDay: day.isWorkingDay,
+                isHoliday: day.isHoliday,
+                isClosed: day.isClosed,
+                countsTowardQuota: day.countsTowardQuota,
+                workingHours: day.workingHours,
+            } as LeaveDay;
             const existing = grouped.get(key);
             if (existing) {
-                existing.push(day);
+                existing.push(compactDay);
             } else {
-                grouped.set(key, [day]);
+                grouped.set(key, [compactDay]);
             }
         });
 
