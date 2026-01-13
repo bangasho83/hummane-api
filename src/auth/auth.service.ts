@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as admin from 'firebase-admin';
 import { ConfigService } from '@nestjs/config';
@@ -78,9 +78,11 @@ export class AuthService {
     }
 
     async login(firebaseToken: string) {
+        let loginEmail: string | undefined;
         try {
             const decodedToken = await this.verifyFirebaseToken(firebaseToken);
             const { email, uid, name, picture } = decodedToken;
+            loginEmail = email;
 
             if (!email) {
                 throw new UnauthorizedException('Email is required in Firebase token');
@@ -130,8 +132,22 @@ export class AuthService {
                 company: company,
             };
         } catch (error) {
-            console.error('[AuthDebug] Login failed:', error);
-            throw (error instanceof UnauthorizedException) ? error : new Error(`Login failed: ${error.message}`);
+            if (error instanceof UnauthorizedException) {
+                throw error;
+            }
+
+            const details = {
+                name: (error as Error)?.name,
+                code: (error as { code?: string | number })?.code,
+                message: (error as Error)?.message,
+                email: loginEmail,
+            };
+            console.error('[AuthError] Login failed:', details);
+
+            throw new InternalServerErrorException({
+                message: 'Auth login failed',
+                error: details,
+            });
         }
     }
 
