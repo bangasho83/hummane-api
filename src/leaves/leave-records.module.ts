@@ -1,4 +1,4 @@
-import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { BadRequestException, InternalServerErrorException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { LeaveDay, LeaveRecord, LeaveRecordSchema } from '../schemas/hr.schema';
@@ -37,6 +37,17 @@ export class LeaveRecordsService {
         });
     }
 
+    private formatErrorDetails(error: unknown) {
+        const pgError = error as { name?: string; code?: string; message?: string; detail?: string; constraint?: string };
+        return {
+            name: pgError?.name,
+            code: pgError?.code,
+            message: pgError?.message,
+            detail: pgError?.detail,
+            constraint: pgError?.constraint,
+        };
+    }
+
     private selectFields = [
         'id',
         'company_id AS "companyId"',
@@ -69,10 +80,15 @@ export class LeaveRecordsService {
             return weekdayKeys[date.getUTCDay()];
         }
 
-        const formatter = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long' });
-        const date = new Date(`${dateString}T12:00:00Z`);
-        const weekday = formatter.format(date).toLowerCase();
-        return weekdayKeys.includes(weekday) ? weekday : weekdayKeys[date.getUTCDay()];
+        try {
+            const formatter = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long' });
+            const date = new Date(`${dateString}T12:00:00Z`);
+            const weekday = formatter.format(date).toLowerCase();
+            return weekdayKeys.includes(weekday) ? weekday : weekdayKeys[date.getUTCDay()];
+        } catch (error) {
+            const date = new Date(`${dateString}T00:00:00Z`);
+            return weekdayKeys[date.getUTCDay()];
+        }
     }
 
     private roundToTwoDecimals(value: number) {
@@ -246,7 +262,10 @@ export class LeaveRecordsService {
                 return record;
             } catch (error) {
                 this.throwIfForeignKeyError(error);
-                throw error;
+                throw new InternalServerErrorException({
+                    message: 'Leave create failed',
+                    error: this.formatErrorDetails(error),
+                });
             }
         });
     }
@@ -340,7 +359,10 @@ export class LeaveRecordsService {
                 return updated;
             } catch (error) {
                 this.throwIfForeignKeyError(error);
-                throw error;
+                throw new InternalServerErrorException({
+                    message: 'Leave update failed',
+                    error: this.formatErrorDetails(error),
+                });
             }
         });
     }
