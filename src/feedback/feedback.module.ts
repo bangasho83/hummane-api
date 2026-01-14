@@ -114,10 +114,28 @@ export class FeedbackCardsService {
         }
     }
     async delete(id: string, companyId: string) {
-        await this.postgres.query(
-            `DELETE FROM feedback_cards WHERE id = $1 AND company_id = $2`,
-            [id, companyId],
-        );
+        try {
+            await this.postgres.query(
+                `DELETE FROM feedback_cards WHERE id = $1 AND company_id = $2`,
+                [id, companyId],
+            );
+        } catch (error) {
+            const pgError = error as { code?: string; constraint?: string };
+            if (pgError?.code === '23503' && pgError.constraint === 'feedback_entries_card_fk') {
+                throw new BadRequestException({
+                    message: 'Cannot delete feedback card with existing entries',
+                    action: 'Delete feedback entries for this card first, or enable ON DELETE CASCADE on feedback_entries.card_id.',
+                    error: {
+                        code: pgError.code,
+                        constraint: pgError.constraint,
+                    },
+                });
+            }
+            throw new InternalServerErrorException({
+                message: 'Feedback card delete failed',
+                error: this.formatErrorDetails(error),
+            });
+        }
     }
 }
 
