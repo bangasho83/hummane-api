@@ -154,6 +154,50 @@ export class FeedbackEntriesService {
         };
     }
 
+    private buildQuestionKindMap(questions: unknown) {
+        const map = new Map<string, string>();
+        if (!Array.isArray(questions)) return map;
+        questions.forEach((question) => {
+            if (!question || typeof question !== 'object') return;
+            const q = question as { id?: string; kind?: string };
+            if (q.id) {
+                map.set(q.id, (q.kind ?? '').toString().toLowerCase());
+            }
+        });
+        return map;
+    }
+
+    private stripCommentScores(entry: FeedbackEntry, questionKindMap?: Map<string, string>) {
+        if (!questionKindMap) return entry;
+        if (!Array.isArray(entry.answers)) return entry;
+        const answers = entry.answers.map((answer) => {
+            if (!answer || typeof answer !== 'object') return answer;
+            const a = answer as { questionId?: string; score?: unknown; [key: string]: unknown };
+            const kind = a.questionId ? questionKindMap.get(a.questionId) : undefined;
+            if (kind === 'comment') {
+                const { score, ...rest } = a;
+                return rest;
+            }
+            return answer;
+        });
+        return { ...entry, answers };
+    }
+
+    private async applyCommentRule(entry: FeedbackEntry) {
+        if (!entry?.cardId) return entry;
+        const result = await this.postgres.query<{ id: string; questions: unknown }>(
+            `SELECT id, questions
+             FROM feedback_cards
+             WHERE id = $1 AND company_id = $2
+             LIMIT 1`,
+            [entry.cardId, entry.companyId],
+        );
+        const card = result.rows[0];
+        if (!card) return entry;
+        const questionKindMap = this.buildQuestionKindMap(card.questions);
+        return this.stripCommentScores(entry, questionKindMap);
+    }
+
     private selectFields = [
         'id',
         'company_id AS "companyId"',
@@ -199,7 +243,8 @@ export class FeedbackEntriesService {
                     JSON.stringify(data.answers ?? []),
                 ],
             );
-            return result.rows[0];
+            const created = result.rows[0];
+            return this.applyCommentRule(created);
         } catch (error) {
             throw new InternalServerErrorException({
                 message: 'Feedback entry create failed',
@@ -216,7 +261,21 @@ export class FeedbackEntriesService {
              LIMIT $2`,
             [companyId, limit],
         );
-        return result.rows;
+        const entries = result.rows;
+        if (!entries.length) return entries;
+        const cardIds = [...new Set(entries.map(entry => entry.cardId).filter(Boolean))] as string[];
+        if (!cardIds.length) return entries;
+        const cardsResult = await this.postgres.query<{ id: string; questions: unknown }>(
+            `SELECT id, questions
+             FROM feedback_cards
+             WHERE company_id = $1 AND id = ANY($2)`,
+            [companyId, cardIds],
+        );
+        const questionMapByCard = new Map<string, Map<string, string>>();
+        cardsResult.rows.forEach((card) => {
+            questionMapByCard.set(card.id, this.buildQuestionKindMap(card.questions));
+        });
+        return entries.map(entry => this.stripCommentScores(entry, questionMapByCard.get(entry.cardId)));
     }
     async findOne(id: string, companyId: string) {
         const result = await this.postgres.query<FeedbackEntry>(
@@ -226,7 +285,9 @@ export class FeedbackEntriesService {
              LIMIT 1`,
             [id, companyId],
         );
-        return result.rows[0] ?? null;
+        const entry = result.rows[0];
+        if (!entry) return null;
+        return this.applyCommentRule(entry);
     }
     async update(id: string, data: Partial<FeedbackEntry>, companyId: string) {
         const updates: string[] = [];
@@ -277,7 +338,9 @@ export class FeedbackEntriesService {
                  RETURNING ${this.selectFields}`,
                 values,
             );
-            return result.rows[0] ?? null;
+            const updated = result.rows[0];
+            if (!updated) return null;
+            return this.applyCommentRule(updated);
         } catch (error) {
             throw new InternalServerErrorException({
                 message: 'Feedback entry update failed',
