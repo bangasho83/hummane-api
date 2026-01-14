@@ -168,13 +168,13 @@ export class FeedbackEntriesService {
     }
 
     private stripCommentScores(entry: FeedbackEntry, questionKindMap?: Map<string, string>) {
-        if (!questionKindMap) return entry;
         if (!Array.isArray(entry.answers)) return entry;
+        const kindMap = questionKindMap ?? new Map<string, string>();
         const answers = entry.answers.map((answer) => {
             if (!answer || typeof answer !== 'object') return answer;
-            const a = answer as { questionId?: string; score?: unknown; [key: string]: unknown };
-            const kind = a.questionId ? questionKindMap.get(a.questionId) : undefined;
-            if (kind === 'comment') {
+            const a = answer as { questionId?: string; score?: unknown; comment?: unknown; answer?: unknown; [key: string]: unknown };
+            const kind = a.questionId ? kindMap.get(a.questionId) : undefined;
+            if (kind === 'comment' || Object.prototype.hasOwnProperty.call(a, 'comment')) {
                 const { score, ...rest } = a;
                 return rest;
             }
