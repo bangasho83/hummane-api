@@ -75,6 +75,7 @@ erDiagram
         email email
         date startDate
         string employmentType
+        string employmentMode
         string gender
         number salary
         timestamp createdAt

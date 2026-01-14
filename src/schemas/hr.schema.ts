@@ -37,6 +37,7 @@ export const EmployeeSchema = z.object({
     roleName: z.string().optional(),
     startDate: IsoDateSchema,
     employmentType: EmploymentTypeEnum,
+    employmentMode: EmploymentModeEnum.optional(),
     reportingManagerId: z.string().optional(),
     gender: GenderEnum,
     salary: TwoDecimalNumberSchema.optional(),

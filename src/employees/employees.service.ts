@@ -25,6 +25,7 @@ export class EmployeesService {
         'r.title AS "roleName"',
         'e.start_date AS "startDate"',
         'e.employment_type AS "employmentType"',
+        'e.employment_mode AS "employmentMode"',
         'e.reporting_manager_id AS "reportingManagerId"',
         'e.gender',
         'e.salary',
@@ -46,10 +47,11 @@ export class EmployeesService {
                 role_id,
                 start_date,
                 employment_type,
+                employment_mode,
                 reporting_manager_id,
                 gender,
                 salary
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
             RETURNING id`,
             [
                 id,
@@ -62,6 +64,7 @@ export class EmployeesService {
                 data.roleId ?? null,
                 data.startDate,
                 data.employmentType,
+                data.employmentMode ?? null,
                 data.reportingManagerId ?? null,
                 data.gender,
                 data.salary ?? null,
@@ -137,6 +140,10 @@ export class EmployeesService {
         if (updateData.employmentType !== undefined) {
             updates.push(`employment_type = $${index++}`);
             values.push(updateData.employmentType);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'employmentMode')) {
+            updates.push(`employment_mode = $${index++}`);
+            values.push(updateData.employmentMode ?? null);
         }
         if (Object.prototype.hasOwnProperty.call(updateData, 'reportingManagerId')) {
             updates.push(`reporting_manager_id = $${index++}`);

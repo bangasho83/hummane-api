@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS employees (
   role_id uuid,
   start_date date NOT NULL,
   employment_type text NOT NULL,
+  employment_mode text,
   reporting_manager_id uuid,
   gender text NOT NULL,
   salary numeric(12, 2),
