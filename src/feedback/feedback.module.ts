@@ -124,7 +124,7 @@ export class FeedbackCardsService {
             if (pgError?.code === '23503' && pgError.constraint === 'feedback_entries_card_fk') {
                 throw new BadRequestException({
                     message: 'Cannot delete feedback card with existing entries',
-                    action: 'Delete feedback entries for this card first, or enable ON DELETE CASCADE on feedback_entries.card_id.',
+                    action: 'This card has feedback entries. Delete those entries first, then try again.',
                     error: {
                         code: pgError.code,
                         constraint: pgError.constraint,
