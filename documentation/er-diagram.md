@@ -115,6 +115,8 @@ erDiagram
         uuid roleId
         uuid departmentId
         string title
+        string employmentType
+        string employmentMode
         number salaryFrom
         number salaryTo
         string jobStatus

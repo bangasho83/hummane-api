@@ -15,6 +15,7 @@ const OneDecimalNumberSchema = z.number().refine(
 
 // String fields (enum values documented in documentation/enums.json)
 export const EmploymentTypeEnum = z.string().min(1);
+export const EmploymentModeEnum = z.string().min(1);
 export const GenderEnum = z.string().min(1);
 export const JobStatusEnum = z.string().min(1);
 export const FeedbackEntryTypeEnum = z.string().min(1);
@@ -68,6 +69,7 @@ export const JobSchema = z.object({
     roleId: z.string().optional(),
     departmentId: z.string().optional(),
     employmentType: EmploymentTypeEnum.optional(),
+    employmentMode: EmploymentModeEnum.optional(),
     location: z.string().optional(),
     salaryFrom: z.number().int().optional(),
     salaryTo: z.number().int().optional(),

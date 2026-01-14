@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   role_id uuid,
   department_id uuid,
   employment_type text,
+  employment_mode text,
   location text,
   salary_from integer,
   salary_to integer,

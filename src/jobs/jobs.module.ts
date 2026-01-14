@@ -17,6 +17,7 @@ export class JobsService {
         'role_id AS "roleId"',
         'department_id AS "departmentId"',
         'employment_type AS "employmentType"',
+        'employment_mode AS "employmentMode"',
         'location',
         'salary_from AS "salaryFrom"',
         'salary_to AS "salaryTo"',
@@ -36,12 +37,13 @@ export class JobsService {
                 role_id,
                 department_id,
                 employment_type,
+                employment_mode,
                 location,
                 salary_from,
                 salary_to,
                 experience,
                 status
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
             RETURNING ${this.selectFields}`,
             [
                 id,
@@ -50,6 +52,7 @@ export class JobsService {
                 data.roleId ?? null,
                 data.departmentId ?? null,
                 data.employmentType ?? null,
+                data.employmentMode ?? null,
                 data.location ?? null,
                 data.salaryFrom ?? null,
                 data.salaryTo ?? null,
@@ -103,6 +106,10 @@ export class JobsService {
         if (Object.prototype.hasOwnProperty.call(data, 'employmentType')) {
             updates.push(`employment_type = $${index++}`);
             values.push(data.employmentType ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'employmentMode')) {
+            updates.push(`employment_mode = $${index++}`);
+            values.push(data.employmentMode ?? null);
         }
         if (Object.prototype.hasOwnProperty.call(data, 'location')) {
             updates.push(`location = $${index++}`);
