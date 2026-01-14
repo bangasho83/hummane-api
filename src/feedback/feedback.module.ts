@@ -1,4 +1,4 @@
-import { BadRequestException, InternalServerErrorException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { BadRequestException, ConflictException, InternalServerErrorException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { FeedbackCard, FeedbackCardSchema, FeedbackEntry, FeedbackEntrySchema } from '../schemas/hr.schema';
@@ -122,7 +122,7 @@ export class FeedbackCardsService {
         } catch (error) {
             const pgError = error as { code?: string; constraint?: string };
             if (pgError?.code === '23503' && pgError.constraint === 'feedback_entries_card_fk') {
-                throw new BadRequestException({
+                throw new ConflictException({
                     message: 'Cannot delete feedback card with existing entries',
                     action: 'This card has feedback entries. Delete those entries first, then try again.',
                     error: {
