@@ -206,8 +206,8 @@ export class FeedbackEntriesService {
             if (!answer || typeof answer !== 'object') return answer;
             const qData = answer.questionId ? questionMap.get(answer.questionId) : null;
             if (qData) {
-                // Merge question metadata into the answer object
-                return { ...qData, ...answer };
+                // Nest the full question metadata inside the answer object
+                return { ...answer, question: qData };
             }
             return answer;
         });
