@@ -349,6 +349,32 @@ curl -X POST "$BASE_URL/feedback-entries" \
 curl -X GET "$BASE_URL/feedback-entries" \
   -H "Authorization: Bearer $TOKEN"
 
+#### Response Structure
+```json
+{
+  "id": "...",
+  "cardId": "...",
+  "answers": [
+    {
+      "questionId": "q1",
+      "answer": "Consistently delivers...",
+      "question": {
+        "id": "q1",
+        "questionId": "q1",
+        "prompt": "How is their technical performance?",
+        "kind": "text",
+        "weight": 1.0
+      }
+    }
+  ],
+  "card": {
+    "id": "...",
+    "title": "Quarterly Review",
+    "questions": [...] 
+  }
+}
+```
+
 ### GET /feedback-entries/:id
 curl -X GET "$BASE_URL/feedback-entries/YOUR_ENTRY_ID" \
   -H "Authorization: Bearer $TOKEN"
