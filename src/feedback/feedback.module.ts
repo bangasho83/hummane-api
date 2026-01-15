@@ -167,6 +167,28 @@ export class FeedbackEntriesService {
         return map;
     }
 
+    private enrichAnswersWithQuestionData(entry: FeedbackEntry, card: FeedbackCard) {
+        if (!Array.isArray(entry.answers) || !Array.isArray(card.questions)) return entry;
+
+        const questionMap = new Map<string, any>();
+        card.questions.forEach((q: any) => {
+            if (q.id) questionMap.set(q.id, q);
+        });
+
+        entry.answers = entry.answers.map((answer: any) => {
+            if (!answer || typeof answer !== 'object') return answer;
+            const qData = answer.questionId ? questionMap.get(answer.questionId) : null;
+            if (qData) {
+                // Merge question metadata into the answer object
+                const { id, ...metadata } = qData;
+                return { ...answer, ...metadata };
+            }
+            return answer;
+        });
+
+        return entry;
+    }
+
     private stripCommentScores(entry: FeedbackEntry, questionKindMap?: Map<string, string>) {
         if (!Array.isArray(entry.answers)) return entry;
         const kindMap = questionKindMap ?? new Map<string, string>();
@@ -189,14 +211,14 @@ export class FeedbackEntriesService {
             `SELECT id, company_id AS "companyId", title, subject, questions, created_at AS "createdAt", updated_at AS "updatedAt"
              FROM feedback_cards
              WHERE id = $1 AND company_id = $2
-             LIMIT 1`,
+            LIMIT 1`,
             [entry.cardId, entry.companyId],
         );
         const card = result.rows[0];
         if (!card) return entry;
 
-        // Attach the full card object
-        entry.card = card;
+        // Enrich answers with question metadata
+        this.enrichAnswersWithQuestionData(entry, card);
 
         const questionKindMap = this.buildQuestionKindMap(card.questions);
         return this.stripCommentScores(entry, questionKindMap);
@@ -285,8 +307,9 @@ export class FeedbackEntriesService {
         });
 
         return entries.map(entry => {
-            if (entry.cardId) {
-                entry.card = cardMap.get(entry.cardId);
+            const card = entry.cardId ? cardMap.get(entry.cardId) : null;
+            if (card) {
+                this.enrichAnswersWithQuestionData(entry, card);
             }
             return this.stripCommentScores(entry, questionMapByCard.get(entry.cardId));
         });

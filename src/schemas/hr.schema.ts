@@ -227,7 +227,6 @@ export const FeedbackEntrySchema = z.object({
     authorId: z.string().optional(),
     authorName: z.string().optional(),
     answers: z.array(z.any()),
-    card: FeedbackCardSchema.optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });
