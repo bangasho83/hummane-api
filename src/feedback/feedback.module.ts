@@ -1,4 +1,6 @@
 import { BadRequestException, ConflictException, InternalServerErrorException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { UsersService } from '../users/users.service';
+import { UsersModule } from '../users/users.module';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { FeedbackCard, FeedbackCardSchema, FeedbackEntry, FeedbackEntrySchema } from '../schemas/hr.schema';
@@ -461,13 +463,20 @@ export class FeedbackCardsController {
 @Controller('feedback-entries')
 @UseGuards(AuthGuard, CompanyGuard)
 export class FeedbackEntriesController {
-    constructor(private service: FeedbackEntriesService) { }
-    @Post() create(@Body() d: FeedbackEntry, @Req() req) {
+    constructor(private service: FeedbackEntriesService, private usersService: UsersService) { }
+    @Post() async create(@Body() d: FeedbackEntry, @Req() req) {
         const user = req.user;
         // 1. Force companyId from token
         d.companyId = user.companyId;
 
-        // 2. Validate and retrieve clean data
+        // 2. Auto-populate author information if missing
+        if (!d.authorId) d.authorId = user.id;
+        if (!d.authorName && d.authorId === user.id) {
+            const fullUser = await this.usersService.findOne(user.id);
+            if (fullUser) d.authorName = fullUser.name;
+        }
+
+        // 3. Validate and retrieve clean data
         const v = FeedbackEntrySchema.safeParse(d);
         if (!v.success) {
             throw new BadRequestException(v.error.issues);
@@ -487,6 +496,7 @@ export class FeedbackEntriesController {
 }
 
 @Module({
+    imports: [UsersModule],
     controllers: [FeedbackCardsController, FeedbackEntriesController],
     providers: [FeedbackCardsService, FeedbackEntriesService],
     exports: [FeedbackCardsService, FeedbackEntriesService]

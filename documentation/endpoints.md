@@ -343,7 +343,19 @@ curl -X DELETE "$BASE_URL/feedback-cards/YOUR_CARD_ID" \
 curl -X POST "$BASE_URL/feedback-entries" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"cardId":"YOUR_CARD_ID","type":"performance","subjectType":"Employee","subjectId":"YOUR_EMPLOYEE_ID","subjectName":"Jane Doe","answers":[{"questionId":"q1","answer":"Great"}],"companyId":"YOUR_COMPANY_ID"}'
+  -d '{
+    "cardId":"YOUR_CARD_ID",
+    "type":"performance",
+    "subjectType":"Employee",
+    "subjectId":"YOUR_EMPLOYEE_ID",
+    "subjectName":"Jane Doe",
+    "authorId":"YOUR_USER_ID",
+    "authorName":"Your Name",
+    "answers":[{"questionId":"q1","answer":"Great"}]
+  }'
+
+> [!NOTE]
+> `authorId` and `authorName` are optional in the request. If omitted, the API will automatically populate them from the authenticated user session.
 
 ### GET /feedback-entries
 curl -X GET "$BASE_URL/feedback-entries" \
