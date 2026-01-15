@@ -32,6 +32,18 @@ export class FeedbackCardsService {
         'updated_at AS "updatedAt"',
     ].join(', ');
 
+    private normalizeCardQuestions(card: FeedbackCard) {
+        if (!card || !Array.isArray(card.questions)) return card;
+        card.questions = card.questions.map((q: any) => {
+            if (q && typeof q === 'object') {
+                const questionId = q.questionId || q.id;
+                return { ...q, questionId };
+            }
+            return q;
+        });
+        return card;
+    }
+
     async create(data: FeedbackCard) {
         const id = data.id || uuidv4();
         try {
@@ -47,7 +59,7 @@ export class FeedbackCardsService {
                     JSON.stringify(data.questions ?? []),
                 ],
             );
-            return result.rows[0];
+            return this.normalizeCardQuestions(result.rows[0]);
         } catch (error) {
             throw new InternalServerErrorException({
                 message: 'Feedback card create failed',
@@ -64,7 +76,7 @@ export class FeedbackCardsService {
              LIMIT $2`,
             [companyId, limit],
         );
-        return result.rows;
+        return result.rows.map(card => this.normalizeCardQuestions(card));
     }
     async findOne(id: string, companyId: string) {
         const result = await this.postgres.query<FeedbackCard>(
@@ -74,7 +86,8 @@ export class FeedbackCardsService {
              LIMIT 1`,
             [id, companyId],
         );
-        return result.rows[0] ?? null;
+        const card = result.rows[0];
+        return card ? this.normalizeCardQuestions(card) : null;
     }
     async update(id: string, data: Partial<FeedbackCard>, companyId: string) {
         const updates: string[] = [];
@@ -105,7 +118,8 @@ export class FeedbackCardsService {
                  RETURNING ${this.selectFields}`,
                 values,
             );
-            return result.rows[0] ?? null;
+            const updated = result.rows[0];
+            return updated ? this.normalizeCardQuestions(updated) : null;
         } catch (error) {
             throw new InternalServerErrorException({
                 message: 'Feedback card update failed',
@@ -154,6 +168,18 @@ export class FeedbackEntriesService {
         };
     }
 
+    private normalizeCardQuestions(card: FeedbackCard) {
+        if (!card || !Array.isArray(card.questions)) return card;
+        card.questions = card.questions.map((q: any) => {
+            if (q && typeof q === 'object') {
+                const questionId = q.questionId || q.id;
+                return { ...q, questionId };
+            }
+            return q;
+        });
+        return card;
+    }
+
     private buildQuestionKindMap(questions: unknown) {
         const map = new Map<string, string>();
         if (!Array.isArray(questions)) return map;
@@ -194,6 +220,9 @@ export class FeedbackEntriesService {
         );
         const card = result.rows[0];
         if (!card) return entry;
+
+        // Normalize question IDs
+        this.normalizeCardQuestions(card);
 
         // Attach the full card object
         entry.card = card;
@@ -280,8 +309,9 @@ export class FeedbackEntriesService {
         const questionMapByCard = new Map<string, Map<string, string>>();
 
         cardsResult.rows.forEach((card) => {
-            cardMap.set(card.id, card);
-            questionMapByCard.set(card.id, this.buildQuestionKindMap(card.questions));
+            const normalized = this.normalizeCardQuestions(card);
+            cardMap.set(normalized.id, normalized);
+            questionMapByCard.set(normalized.id, this.buildQuestionKindMap(normalized.questions));
         });
 
         return entries.map(entry => {
