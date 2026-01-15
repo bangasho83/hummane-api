@@ -89,10 +89,10 @@ export class FeedbackCardsService {
             updates.push(`subject = $${index++}`);
             values.push(data.subject ?? null);
         }
-            if (Object.prototype.hasOwnProperty.call(data, 'questions')) {
-                updates.push(`questions = $${index++}::jsonb`);
-                values.push(JSON.stringify(data.questions ?? []));
-            }
+        if (Object.prototype.hasOwnProperty.call(data, 'questions')) {
+            updates.push(`questions = $${index++}::jsonb`);
+            values.push(JSON.stringify(data.questions ?? []));
+        }
 
         updates.push('updated_at = now()');
         values.push(id, companyId);
@@ -172,7 +172,7 @@ export class FeedbackEntriesService {
         const kindMap = questionKindMap ?? new Map<string, string>();
         const answers = entry.answers.map((answer) => {
             if (!answer || typeof answer !== 'object') return answer;
-            const a = answer as { questionId?: string; score?: unknown; comment?: unknown; answer?: unknown; [key: string]: unknown };
+            const a = answer as { questionId?: string; score?: unknown; comment?: unknown; answer?: unknown;[key: string]: unknown };
             const kind = a.questionId ? kindMap.get(a.questionId) : undefined;
             if (kind === 'comment' || Object.prototype.hasOwnProperty.call(a, 'comment')) {
                 const { score, ...rest } = a;
@@ -185,8 +185,8 @@ export class FeedbackEntriesService {
 
     private async applyCommentRule(entry: FeedbackEntry) {
         if (!entry?.cardId) return entry;
-        const result = await this.postgres.query<{ id: string; questions: unknown }>(
-            `SELECT id, questions
+        const result = await this.postgres.query<FeedbackCard>(
+            `SELECT id, company_id AS "companyId", title, subject, questions, created_at AS "createdAt", updated_at AS "updatedAt"
              FROM feedback_cards
              WHERE id = $1 AND company_id = $2
              LIMIT 1`,
@@ -194,6 +194,10 @@ export class FeedbackEntriesService {
         );
         const card = result.rows[0];
         if (!card) return entry;
+
+        // Attach the full card object
+        entry.card = card;
+
         const questionKindMap = this.buildQuestionKindMap(card.questions);
         return this.stripCommentScores(entry, questionKindMap);
     }
@@ -265,17 +269,27 @@ export class FeedbackEntriesService {
         if (!entries.length) return entries;
         const cardIds = [...new Set(entries.map(entry => entry.cardId).filter(Boolean))] as string[];
         if (!cardIds.length) return entries;
-        const cardsResult = await this.postgres.query<{ id: string; questions: unknown }>(
-            `SELECT id, questions
+        const cardsResult = await this.postgres.query<FeedbackCard>(
+            `SELECT id, company_id AS "companyId", title, subject, questions, created_at AS "createdAt", updated_at AS "updatedAt"
              FROM feedback_cards
              WHERE company_id = $1 AND id = ANY($2)`,
             [companyId, cardIds],
         );
+
+        const cardMap = new Map<string, FeedbackCard>();
         const questionMapByCard = new Map<string, Map<string, string>>();
+
         cardsResult.rows.forEach((card) => {
+            cardMap.set(card.id, card);
             questionMapByCard.set(card.id, this.buildQuestionKindMap(card.questions));
         });
-        return entries.map(entry => this.stripCommentScores(entry, questionMapByCard.get(entry.cardId)));
+
+        return entries.map(entry => {
+            if (entry.cardId) {
+                entry.card = cardMap.get(entry.cardId);
+            }
+            return this.stripCommentScores(entry, questionMapByCard.get(entry.cardId));
+        });
     }
     async findOne(id: string, companyId: string) {
         const result = await this.postgres.query<FeedbackEntry>(
