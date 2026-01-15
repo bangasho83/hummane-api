@@ -193,6 +193,28 @@ export class FeedbackEntriesService {
         return map;
     }
 
+    private enrichAnswersWithQuestionData(entry: FeedbackEntry, card: FeedbackCard) {
+        if (!Array.isArray(entry.answers) || !Array.isArray(card.questions)) return entry;
+
+        const questionMap = new Map<string, any>();
+        card.questions.forEach((q: any) => {
+            const qId = q.questionId || q.id;
+            if (qId) questionMap.set(qId, q);
+        });
+
+        entry.answers = entry.answers.map((answer: any) => {
+            if (!answer || typeof answer !== 'object') return answer;
+            const qData = answer.questionId ? questionMap.get(answer.questionId) : null;
+            if (qData) {
+                // Merge question metadata into the answer object
+                return { ...qData, ...answer };
+            }
+            return answer;
+        });
+
+        return entry;
+    }
+
     private stripCommentScores(entry: FeedbackEntry, questionKindMap?: Map<string, string>) {
         if (!Array.isArray(entry.answers)) return entry;
         const kindMap = questionKindMap ?? new Map<string, string>();
@@ -224,8 +246,11 @@ export class FeedbackEntriesService {
         // Normalize question IDs
         this.normalizeCardQuestions(card);
 
-        // Attach the full card object
+        // 1. Attach the full card object
         entry.card = card;
+
+        // 2. Enrich answers with specific question metadata
+        this.enrichAnswersWithQuestionData(entry, card);
 
         const questionKindMap = this.buildQuestionKindMap(card.questions);
         return this.stripCommentScores(entry, questionKindMap);
@@ -317,7 +342,10 @@ export class FeedbackEntriesService {
         return entries.map(entry => {
             const card = entry.cardId ? cardMap.get(entry.cardId) : null;
             if (card) {
+                // 1. Attach card
                 entry.card = card;
+                // 2. Enrich answers
+                this.enrichAnswersWithQuestionData(entry, card);
             }
             return this.stripCommentScores(entry, questionMapByCard.get(entry.cardId));
         });
