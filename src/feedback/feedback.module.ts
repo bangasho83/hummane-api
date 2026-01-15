@@ -172,7 +172,8 @@ export class FeedbackEntriesService {
 
         const questionMap = new Map<string, any>();
         card.questions.forEach((q: any) => {
-            if (q.id) questionMap.set(q.id, q);
+            const qId = q.id || q.questionId;
+            if (qId) questionMap.set(qId, q);
         });
 
         entry.answers = entry.answers.map((answer: any) => {
@@ -180,8 +181,8 @@ export class FeedbackEntriesService {
             const qData = answer.questionId ? questionMap.get(answer.questionId) : null;
             if (qData) {
                 // Merge question metadata into the answer object
-                const { id, ...metadata } = qData;
-                return { ...answer, ...metadata };
+                // Metadata first, then answer details (ensures the actual answer overrides any defaults)
+                return { ...qData, ...answer };
             }
             return answer;
         });
@@ -211,7 +212,7 @@ export class FeedbackEntriesService {
             `SELECT id, company_id AS "companyId", title, subject, questions, created_at AS "createdAt", updated_at AS "updatedAt"
              FROM feedback_cards
              WHERE id = $1 AND company_id = $2
-            LIMIT 1`,
+             LIMIT 1`,
             [entry.cardId, entry.companyId],
         );
         const card = result.rows[0];
