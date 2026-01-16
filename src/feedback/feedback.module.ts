@@ -198,21 +198,38 @@ export class FeedbackEntriesService {
     private enrichAnswersWithQuestionData(entry: FeedbackEntry, card: FeedbackCard) {
         if (!Array.isArray(entry.answers) || !Array.isArray(card.questions)) return entry;
 
+        // 1. Map answers for quick lookup
+        const answerMap = new Map<string, any>();
+        entry.answers.forEach((a: any) => {
+            if (a?.questionId) answerMap.set(a.questionId, a);
+        });
+
         const questionMap = new Map<string, any>();
         card.questions.forEach((q: any) => {
             const qId = q.questionId || q.id;
             if (qId) questionMap.set(qId, q);
         });
 
+        // 2. Enrich top-level answers
         entry.answers = entry.answers.map((answer: any) => {
             if (!answer || typeof answer !== 'object') return answer;
             const qData = answer.questionId ? questionMap.get(answer.questionId) : null;
             if (qData) {
-                // Nest the full question metadata inside the answer object
                 return { ...answer, question: qData };
             }
             return answer;
         });
+
+        // 3. Nest answer in card questions
+        // We clone to avoid affecting other entries sharing the same card object
+        entry.card = {
+            ...card,
+            questions: card.questions.map((q: any) => {
+                const qId = q.questionId || q.id;
+                const matchingAnswer = qId ? answerMap.get(qId) : null;
+                return matchingAnswer ? { ...q, answer: matchingAnswer.answer } : q;
+            }),
+        };
 
         return entry;
     }

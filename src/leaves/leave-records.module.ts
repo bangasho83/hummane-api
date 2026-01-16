@@ -328,15 +328,23 @@ export class LeaveRecordsService {
         });
     }
 
-    async findAll(companyId: string, limit = 50) {
+    async findAll(companyId: string, limit = 50, employeeId?: string) {
+        const queryParts = [`lr.company_id = $1`];
+        const queryValues: any[] = [companyId];
+
+        if (employeeId) {
+            queryValues.push(employeeId);
+            queryParts.push(`lr.employee_id = $${queryValues.length}`);
+        }
+
         const result = await this.postgres.query<LeaveRecord>(
             `SELECT ${this.selectFields}
              FROM leave_records lr
              LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id
-             WHERE lr.company_id = $1
-             ORDER BY lr.created_at DESC
-             LIMIT $2`,
-            [companyId, limit],
+             WHERE ${queryParts.join(' AND ')}
+             ORDER BY lr.start_date ASC
+             LIMIT $${queryValues.length + 1}`,
+            [...queryValues, limit],
         );
         return this.attachLeaveDays(result.rows);
     }
@@ -477,8 +485,8 @@ export class LeaveRecordsController {
     }
 
     @Get()
-    findAll(@Req() req, @Query('limit') limit?: string) {
-        return this.service.findAll(req.user.companyId, parseLimit(limit));
+    findAll(@Req() req, @Query('limit') limit?: string, @Query('employeeId') employeeId?: string) {
+        return this.service.findAll(req.user.companyId, parseLimit(limit), employeeId);
     }
 
     @Get(':id')
