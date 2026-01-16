@@ -198,19 +198,17 @@ export class FeedbackEntriesService {
     private enrichAnswersWithQuestionData(entry: FeedbackEntry, card: FeedbackCard) {
         if (!Array.isArray(entry.answers) || !Array.isArray(card.questions)) return entry;
 
-        // 1. Map answers for quick lookup
-        const answerMap = new Map<string, any>();
-        entry.answers.forEach((a: any) => {
-            if (a?.questionId) answerMap.set(a.questionId, a);
-        });
+        // 1. Ensure card questions are normalized with IDs
+        const normalizedCard = this.normalizeCardQuestions({ ...card });
+        const questions = normalizedCard.questions as any[];
 
+        // 2. Map questions for quick lookup
         const questionMap = new Map<string, any>();
-        card.questions.forEach((q: any) => {
-            const qId = q.questionId || q.id;
-            if (qId) questionMap.set(qId, q);
+        questions.forEach((q: any) => {
+            if (q.questionId) questionMap.set(q.questionId, q);
         });
 
-        // 2. Enrich top-level answers
+        // 3. Enrich top-level answers with question metadata
         entry.answers = entry.answers.map((answer: any) => {
             if (!answer || typeof answer !== 'object') return answer;
             const qData = answer.questionId ? questionMap.get(answer.questionId) : null;
@@ -220,14 +218,22 @@ export class FeedbackEntriesService {
             return answer;
         });
 
-        // 3. Nest answer in card questions
-        // We clone to avoid affecting other entries sharing the same card object
+        // 4. Create lookup for current answers to nest them back into questions
+        const answerMap = new Map<string, any>();
+        entry.answers.forEach((a: any) => {
+            if (a?.questionId) {
+                // We use a shallow copy without the 'question' back-reference to avoid circularity
+                const { question, ...answerOnly } = a;
+                answerMap.set(a.questionId, answerOnly);
+            }
+        });
+
+        // 5. Nest original answers inside cloned card questions
         entry.card = {
-            ...card,
-            questions: card.questions.map((q: any) => {
-                const qId = q.questionId || q.id;
-                const matchingAnswer = qId ? answerMap.get(qId) : null;
-                return matchingAnswer ? { ...q, answer: matchingAnswer.answer } : q;
+            ...normalizedCard,
+            questions: questions.map((q: any) => {
+                const matchingAnswer = q.questionId ? answerMap.get(q.questionId) : null;
+                return matchingAnswer ? { ...q, answer: matchingAnswer } : q;
             }),
         };
 
