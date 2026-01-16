@@ -409,30 +409,6 @@ export class FeedbackEntriesService {
         const values: unknown[] = [];
         let index = 1;
 
-        if (Object.prototype.hasOwnProperty.call(data, 'cardId')) {
-            updates.push(`card_id = $${index++}`);
-            values.push(data.cardId ?? null);
-        }
-        if (Object.prototype.hasOwnProperty.call(data, 'type')) {
-            updates.push(`type = $${index++}`);
-            values.push(data.type ?? null);
-        }
-        if (Object.prototype.hasOwnProperty.call(data, 'subjectType')) {
-            updates.push(`subject_type = $${index++}`);
-            values.push(data.subjectType ?? null);
-        }
-        if (Object.prototype.hasOwnProperty.call(data, 'subjectId')) {
-            updates.push(`subject_id = $${index++}`);
-            values.push(data.subjectId ?? null);
-        }
-        if (Object.prototype.hasOwnProperty.call(data, 'subjectName')) {
-            updates.push(`subject_name = $${index++}`);
-            values.push(data.subjectName ?? null);
-        }
-        if (Object.prototype.hasOwnProperty.call(data, 'authorId')) {
-            updates.push(`author_id = $${index++}`);
-            values.push(data.authorId ?? null);
-        }
         if (Object.prototype.hasOwnProperty.call(data, 'answers')) {
             updates.push(`answers = $${index++}::jsonb`);
             values.push(JSON.stringify(data.answers ?? []));
