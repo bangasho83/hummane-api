@@ -27,6 +27,7 @@ export class EmployeesService {
         'e.employment_type AS "employmentType"',
         'e.employment_mode AS "employmentMode"',
         'e.reporting_manager_id AS "reportingManagerId"',
+        'm.name AS "reportingManagerName"',
         'e.gender',
         'e.salary',
         'e.created_at AS "createdAt"',
