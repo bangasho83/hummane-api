@@ -12,15 +12,16 @@ export class LeaveRecordsService {
     constructor(private postgres: PostgresService) { }
 
     private leaveDaySelectFields = [
-        'id',
-        'leave_record_id AS "leaveRecordId"',
-        'date',
-        'day_of_week AS "dayOfWeek"',
-        'is_working_day AS "isWorkingDay"',
-        'is_holiday AS "isHoliday"',
-        'is_closed AS "isClosed"',
-        'counts_toward_quota AS "countsTowardQuota"',
-        'working_hours AS "workingHours"',
+        'ld.id',
+        'ld.leave_record_id AS "leaveRecordId"',
+        'ld.date',
+        'ld.day_of_week AS "dayOfWeek"',
+        'ld.is_working_day AS "isWorkingDay"',
+        'ld.is_holiday AS "isHoliday"',
+        'ld.is_closed AS "isClosed"',
+        'ld.counts_toward_quota AS "countsTowardQuota"',
+        'lt.color AS "leaveTypeColor"',
+        'ld.working_hours AS "workingHours"',
     ].join(', ');
 
     private throwIfForeignKeyError(error: unknown) {
@@ -68,6 +69,7 @@ export class LeaveRecordsService {
         'lt.name AS "leaveTypeName"',
         'lt.code AS "leaveTypeCode"',
         'lt.quota AS "leaveTypeQuota"',
+        'lt.color AS "leaveTypeColor"',
         'lr.start_date AS "startDate"',
         'lr.end_date AS "endDate"',
         'lr.unit',
@@ -237,9 +239,10 @@ export class LeaveRecordsService {
         const recordIds = records.map(record => record.id) as string[];
         const result = await this.postgres.query<LeaveDay>(
             `SELECT ${this.leaveDaySelectFields}
-             FROM leave_days
-             WHERE company_id = $1 AND leave_record_id = ANY($2)
-             ORDER BY date ASC`,
+             FROM leave_days ld
+             LEFT JOIN leave_types lt ON lt.id = ld.leave_type_id
+             WHERE ld.company_id = $1 AND ld.leave_record_id = ANY($2)
+             ORDER BY ld.date ASC`,
             [records[0].companyId, recordIds],
         );
 
@@ -254,6 +257,7 @@ export class LeaveRecordsService {
                 isHoliday: day.isHoliday,
                 isClosed: day.isClosed,
                 countsTowardQuota: day.countsTowardQuota,
+                leaveTypeColor: day.leaveTypeColor,
                 workingHours: day.workingHours,
             } as LeaveDay;
             const existing = grouped.get(key);

@@ -262,6 +262,29 @@ curl -X POST "$BASE_URL/leaves" \
   -H "Content-Type: application/json" \
   -d '{"employeeId":"EMP-001","leaveTypeId":"YOUR_LEAVE_TYPE_ID","startDate":"2024-01-16","endDate":"2024-01-18","unit":"Day","amount":1,"note":"Family event","documents":{"files":["https://example.com/leave-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
 
+### GET /leaves
+curl -X GET "$BASE_URL/leaves" \
+  -H "Authorization: Bearer $TOKEN"
+
+#### Response Structure (item)
+```json
+{
+  "id": "...",
+  "leaveTypeName": "Annual Leave",
+  "leaveTypeColor": "#e51451",
+  "startDate": "2024-01-16",
+  "endDate": "2024-01-18",
+  "amount": 3,
+  "leaveDays": [
+    {
+      "date": "2024-01-16",
+      "leaveTypeColor": "#e51451",
+      "isWorkingDay": true
+    }
+  ]
+}
+```
+
 Leave days are expanded per calendar date; non-working days/holidays are flagged and do not count toward quota.
 Hourly leave must use the same start/end date and `amount` is hours.
 If `employeeId`, `companyId`, or `leaveTypeId` does not exist, the API returns 400 with a descriptive message.
