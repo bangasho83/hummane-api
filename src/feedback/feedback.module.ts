@@ -198,42 +198,57 @@ export class FeedbackEntriesService {
     private enrichAnswersWithQuestionData(entry: FeedbackEntry, card: FeedbackCard) {
         if (!Array.isArray(entry.answers) || !Array.isArray(card.questions)) return entry;
 
-        // 1. Ensure card questions are normalized with IDs
+        // 1. Normalize the card to ensure we have a common ID field (questionId)
         const normalizedCard = this.normalizeCardQuestions({ ...card });
         const questions = normalizedCard.questions as any[];
 
-        // 2. Map questions for quick lookup
+        // 2. Prepare answer lookup map (by questionId)
+        const answerMap = new Map<string, any>();
+        entry.answers.forEach((a: any) => {
+            if (a?.questionId) answerMap.set(a.questionId, a);
+        });
+
+        // 3. Prepare question lookup map (by questionId) for top-level answer enrichment
         const questionMap = new Map<string, any>();
         questions.forEach((q: any) => {
             if (q.questionId) questionMap.set(q.questionId, q);
         });
 
-        // 3. Enrich top-level answers with question metadata
-        entry.answers = entry.answers.map((answer: any) => {
-            if (!answer || typeof answer !== 'object') return answer;
-            const qData = answer.questionId ? questionMap.get(answer.questionId) : null;
-            if (qData) {
-                return { ...answer, question: qData };
-            }
-            return answer;
+        // 4. Enrich top-level answers with question metadata
+        entry.answers = entry.answers.map((a: any) => {
+            if (!a || typeof a !== 'object') return a;
+            const qData = a.questionId ? questionMap.get(a.questionId) : null;
+            return qData ? { ...a, question: qData } : a;
         });
 
-        // 4. Create lookup for current answers to nest them back into questions
-        const answerMap = new Map<string, any>();
-        entry.answers.forEach((a: any) => {
-            if (a?.questionId) {
-                // We use a shallow copy without the 'question' back-reference to avoid circularity
-                const { question, ...answerOnly } = a;
-                answerMap.set(a.questionId, answerOnly);
-            }
-        });
+        // 5. Build nested card structure with answers inside questions
+        // Fallback: If ID matching fails, we try to match by index for non-content blocks
+        const answerableQuestions = questions.filter(q => q.kind !== 'content');
 
-        // 5. Nest original answers inside cloned card questions
         entry.card = {
             ...normalizedCard,
             questions: questions.map((q: any) => {
-                const matchingAnswer = q.questionId ? answerMap.get(q.questionId) : null;
-                return matchingAnswer ? { ...q, answer: matchingAnswer } : q;
+                let matchingAnswer = null;
+
+                if (q.questionId) {
+                    matchingAnswer = answerMap.get(q.questionId);
+                }
+
+                // Fallback to index-based matching if no ID match and not a content block
+                if (!matchingAnswer && q.kind !== 'content') {
+                    const qIndex = answerableQuestions.indexOf(q);
+                    if (qIndex !== -1 && entry.answers[qIndex]) {
+                        matchingAnswer = entry.answers[qIndex];
+                    }
+                }
+
+                if (matchingAnswer) {
+                    // Inject full answer (minus 'question' back-ref to avoid circularity)
+                    const { question, ...answerOnly } = matchingAnswer;
+                    return { ...q, answer: answerOnly };
+                }
+
+                return q;
             }),
         };
 
