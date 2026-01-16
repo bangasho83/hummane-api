@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, InternalServerErrorException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { UsersModule } from '../users/users.module';
+import { EmployeesModule } from '../employees/employees.module';
+import { EmployeesService } from '../employees/employees.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { FeedbackCard, FeedbackCardSchema, FeedbackEntry, FeedbackEntrySchema } from '../schemas/hr.schema';
@@ -306,6 +308,7 @@ export class FeedbackEntriesService {
         'subject_name AS "subjectName"',
         'author_id AS "authorId"',
         'author_name AS "authorName"',
+        'author_employee_id AS "authorEmployeeId"',
         'answers',
         'created_at AS "createdAt"',
         'updated_at AS "updatedAt"',
@@ -325,8 +328,9 @@ export class FeedbackEntriesService {
                     subject_name,
                     author_id,
                     author_name,
+                    author_employee_id,
                     answers
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
                 RETURNING ${this.selectFields}`,
                 [
                     id,
@@ -338,6 +342,7 @@ export class FeedbackEntriesService {
                     data.subjectName ?? null,
                     data.authorId ?? null,
                     data.authorName ?? null,
+                    data.authorEmployeeId ?? null,
                     JSON.stringify(data.answers ?? []),
                 ],
             );
@@ -435,6 +440,10 @@ export class FeedbackEntriesService {
             updates.push(`author_name = $${index++}`);
             values.push(data.authorName ?? null);
         }
+        if (Object.prototype.hasOwnProperty.call(data, 'authorEmployeeId')) {
+            updates.push(`author_employee_id = $${index++}`);
+            values.push(data.authorEmployeeId ?? null);
+        }
         if (Object.prototype.hasOwnProperty.call(data, 'answers')) {
             updates.push(`answers = $${index++}::jsonb`);
             values.push(JSON.stringify(data.answers ?? []));
@@ -501,7 +510,11 @@ export class FeedbackCardsController {
 @Controller('feedback-entries')
 @UseGuards(AuthGuard, CompanyGuard)
 export class FeedbackEntriesController {
-    constructor(private service: FeedbackEntriesService, private usersService: UsersService) { }
+    constructor(
+        private service: FeedbackEntriesService,
+        private usersService: UsersService,
+        private employeesService: EmployeesService
+    ) { }
     @Post() async create(@Body() d: FeedbackEntry, @Req() req) {
         const user = req.user;
         // 1. Force companyId from token
@@ -514,13 +527,19 @@ export class FeedbackEntriesController {
             if (fullUser) d.authorName = fullUser.name;
         }
 
-        // 3. Validate and retrieve clean data
+        // 3. Auto-populate author employee information if missing
+        if (!d.authorEmployeeId && d.authorId === user.id) {
+            const employee = await this.employeesService.findByUserId(user.id, user.companyId);
+            if (employee) d.authorEmployeeId = employee.employeeId;
+        }
+
+        // 4. Validate and retrieve clean data
         const v = FeedbackEntrySchema.safeParse(d);
         if (!v.success) {
             throw new BadRequestException(v.error.issues);
         }
 
-        // 3. Persist validated data
+        // 5. Persist validated data
         return this.service.create(v.data as FeedbackEntry);
     }
     @Get() findAll(@Req() req, @Query('limit') limit?: string) { return this.service.findAll(req.user.companyId, parseLimit(limit)); }
@@ -534,7 +553,7 @@ export class FeedbackEntriesController {
 }
 
 @Module({
-    imports: [UsersModule],
+    imports: [UsersModule, EmployeesModule],
     controllers: [FeedbackCardsController, FeedbackEntriesController],
     providers: [FeedbackCardsService, FeedbackEntriesService],
     exports: [FeedbackCardsService, FeedbackEntriesService]

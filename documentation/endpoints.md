@@ -351,11 +351,12 @@ curl -X POST "$BASE_URL/feedback-entries" \
     "subjectName":"Jane Doe",
     "authorId":"YOUR_USER_ID",
     "authorName":"Your Name",
+    "authorEmployeeId":"YOUR_EMPLOYEE_ID",
     "answers":[{"questionId":"q1","answer":"Great"}]
   }'
 
 > [!NOTE]
-> `authorId` and `authorName` are optional in the request. If omitted, the API will automatically populate them from the authenticated user session.
+> `authorId`, `authorName`, and `authorEmployeeId` are optional in the request. If omitted, the API will automatically populate them from the authenticated user's session and employee record.
 
 ### GET /feedback-entries
 curl -X GET "$BASE_URL/feedback-entries" \

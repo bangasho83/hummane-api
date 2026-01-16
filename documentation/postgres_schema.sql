@@ -225,6 +225,7 @@ CREATE TABLE IF NOT EXISTS feedback_entries (
   subject_name text,
   author_id uuid,
   author_name text,
+  author_employee_id text,
   answers jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
