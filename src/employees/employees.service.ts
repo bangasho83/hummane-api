@@ -77,6 +77,7 @@ export class EmployeesService {
     async findAll(companyId: string, limit = 50): Promise<Employee[]> {
         const result = await this.postgres.query<Employee>(
             `SELECT ${this.selectFields}
+             FROM employees e
              LEFT JOIN departments d
                ON d.id = e.department_id AND d.company_id = e.company_id
              LEFT JOIN roles r
