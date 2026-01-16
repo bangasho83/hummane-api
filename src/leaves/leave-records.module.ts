@@ -61,18 +61,21 @@ export class LeaveRecordsService {
     }
 
     private selectFields = [
-        'id',
-        'company_id AS "companyId"',
-        'employee_id AS "employeeId"',
-        'leave_type_id AS "leaveTypeId"',
-        'start_date AS "startDate"',
-        'end_date AS "endDate"',
-        'unit',
-        'amount',
-        'note',
-        'documents',
-        'created_at AS "createdAt"',
-        'updated_at AS "updatedAt"',
+        'lr.id',
+        'lr.company_id AS "companyId"',
+        'lr.employee_id AS "employeeId"',
+        'lr.leave_type_id AS "leaveTypeId"',
+        'lt.name AS "leaveTypeName"',
+        'lt.code AS "leaveTypeCode"',
+        'lt.quota AS "leaveTypeQuota"',
+        'lr.start_date AS "startDate"',
+        'lr.end_date AS "endDate"',
+        'lr.unit',
+        'lr.amount',
+        'lr.note',
+        'lr.documents',
+        'lr.created_at AS "createdAt"',
+        'lr.updated_at AS "updatedAt"',
     ].join(', ');
 
     private getDateRange(startDate: string, endDate: string): string[] {
@@ -279,7 +282,7 @@ export class LeaveRecordsService {
                     )
                     : (recordInput.amount ?? null);
 
-                const result = await client.query<LeaveRecord>(
+                await client.query(
                     `INSERT INTO leave_records (
                         id,
                         company_id,
@@ -291,8 +294,7 @@ export class LeaveRecordsService {
                         amount,
                         note,
                         documents
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-                    RETURNING ${this.selectFields}`,
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
                     [
                         id,
                         recordInput.companyId,
@@ -306,9 +308,16 @@ export class LeaveRecordsService {
                         recordInput.documents ?? null,
                     ],
                 );
-                const record = result.rows[0];
                 await this.writeLeaveDays(leaveDays, client);
-                return record;
+                // Return enriched record
+                const result = await client.query<LeaveRecord>(
+                    `SELECT ${this.selectFields}
+                     FROM leave_records lr
+                     LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id
+                     WHERE lr.id = $1 LIMIT 1`,
+                    [id],
+                );
+                return result.rows[0];
             } catch (error) {
                 this.throwIfForeignKeyError(error);
                 throw new InternalServerErrorException({
@@ -322,9 +331,10 @@ export class LeaveRecordsService {
     async findAll(companyId: string, limit = 50) {
         const result = await this.postgres.query<LeaveRecord>(
             `SELECT ${this.selectFields}
-             FROM leave_records
-             WHERE company_id = $1
-             ORDER BY created_at DESC
+             FROM leave_records lr
+             LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id
+             WHERE lr.company_id = $1
+             ORDER BY lr.created_at DESC
              LIMIT $2`,
             [companyId, limit],
         );
@@ -334,8 +344,9 @@ export class LeaveRecordsService {
     async findOne(id: string, companyId: string) {
         const result = await this.postgres.query<LeaveRecord>(
             `SELECT ${this.selectFields}
-             FROM leave_records
-             WHERE id = $1 AND company_id = $2
+             FROM leave_records lr
+             LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id
+             WHERE lr.id = $1 AND lr.company_id = $2
              LIMIT 1`,
             [id, companyId],
         );
@@ -391,15 +402,14 @@ export class LeaveRecordsService {
             values.push(id, companyId);
 
             try {
-                const result = await client.query<LeaveRecord>(
+                await client.query(
                     `UPDATE leave_records
                      SET ${updates.join(', ')}
-                     WHERE id = $${index++} AND company_id = $${index}
-                     RETURNING ${this.selectFields}`,
+                     WHERE id = $${index++} AND company_id = $${index}`,
                     values,
                 );
 
-                let updated = result.rows[0];
+                let updated = await this.findOne(id, companyId);
                 if (!updated) return null;
 
                 if (shouldRebuild) {
@@ -412,14 +422,13 @@ export class LeaveRecordsService {
                             leaveDays.reduce((sum, day) => sum + day.amount, 0),
                         );
                         if (computedAmount !== updated.amount) {
-                            const amountResult = await client.query<LeaveRecord>(
+                            await client.query(
                                 `UPDATE leave_records
                                  SET amount = $1, updated_at = now()
-                                 WHERE id = $2 AND company_id = $3
-                                 RETURNING ${this.selectFields}`,
+                                 WHERE id = $2 AND company_id = $3`,
                                 [computedAmount, id, companyId],
                             );
-                            updated = amountResult.rows[0] ?? updated;
+                            updated = await this.findOne(id, companyId) ?? updated;
                         }
                     }
                 }
