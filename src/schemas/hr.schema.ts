@@ -126,6 +126,7 @@ export const LeaveTypeSchema = z.object({
     unit: LeaveUnitEnum,
     quota: z.number(),
     employmentType: EmploymentTypeEnum.optional(), // Can apply to specific types
+    color: z.string().optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });

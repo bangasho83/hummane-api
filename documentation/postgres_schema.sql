@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS leave_types (
   unit text NOT NULL,
   quota numeric(12, 2) NOT NULL,
   employment_type text,
+  color text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );

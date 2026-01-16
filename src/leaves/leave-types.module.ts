@@ -18,6 +18,7 @@ export class LeaveTypesService {
         'unit',
         'quota',
         'employment_type AS "employmentType"',
+        'color',
         'created_at AS "createdAt"',
         'updated_at AS "updatedAt"',
     ].join(', ');
@@ -25,8 +26,8 @@ export class LeaveTypesService {
     async create(data: LeaveType) {
         const id = data.id || uuidv4();
         const result = await this.postgres.query<LeaveType>(
-            `INSERT INTO leave_types (id, company_id, name, code, unit, quota, employment_type)
-             VALUES ($1,$2,$3,$4,$5,$6,$7)
+            `INSERT INTO leave_types (id, company_id, name, code, unit, quota, employment_type, color)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
              RETURNING ${this.selectFields}`,
             [
                 id,
@@ -36,6 +37,7 @@ export class LeaveTypesService {
                 data.unit,
                 data.quota,
                 data.employmentType ?? null,
+                data.color ?? null,
             ],
         );
         return result.rows[0];
@@ -88,6 +90,10 @@ export class LeaveTypesService {
         if (Object.prototype.hasOwnProperty.call(data, 'employmentType')) {
             updates.push(`employment_type = $${index++}`);
             values.push(data.employmentType ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'color')) {
+            updates.push(`color = $${index++}`);
+            values.push(data.color ?? null);
         }
 
         updates.push('updated_at = now()');

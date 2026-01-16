@@ -235,7 +235,7 @@ curl -X DELETE "$BASE_URL/applicants/YOUR_APPLICANT_ID" \
 curl -X POST "$BASE_URL/leave-types" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Annual Leave","unit":"Day","quota":15,"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"name":"Annual Leave","unit":"Day","quota":15,"color":"#e51451","companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /leave-types
 curl -X GET "$BASE_URL/leave-types" \
@@ -249,7 +249,7 @@ curl -X GET "$BASE_URL/leave-types/YOUR_LEAVE_TYPE_ID" \
 curl -X PUT "$BASE_URL/leave-types/YOUR_LEAVE_TYPE_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"quota":20,"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"quota":20,"color":"#e51451","companyId":"YOUR_COMPANY_ID"}'
 
 ### DELETE /leave-types/:id
 curl -X DELETE "$BASE_URL/leave-types/YOUR_LEAVE_TYPE_ID" \
