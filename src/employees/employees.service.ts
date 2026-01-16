@@ -77,11 +77,12 @@ export class EmployeesService {
     async findAll(companyId: string, limit = 50): Promise<Employee[]> {
         const result = await this.postgres.query<Employee>(
             `SELECT ${this.selectFields}
-             FROM employees e
              LEFT JOIN departments d
                ON d.id = e.department_id AND d.company_id = e.company_id
              LEFT JOIN roles r
                ON r.id = e.role_id AND r.company_id = e.company_id
+             LEFT JOIN employees m
+               ON m.id = e.reporting_manager_id AND m.company_id = e.company_id
              WHERE e.company_id = $1
              ORDER BY e.created_at DESC
              LIMIT $2`,
@@ -98,6 +99,8 @@ export class EmployeesService {
                ON d.id = e.department_id AND d.company_id = e.company_id
              LEFT JOIN roles r
                ON r.id = e.role_id AND r.company_id = e.company_id
+             LEFT JOIN employees m
+               ON m.id = e.reporting_manager_id AND m.company_id = e.company_id
              WHERE e.id = $1 AND e.company_id = $2
              LIMIT 1`,
             [id, companyId],
