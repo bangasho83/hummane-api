@@ -229,8 +229,6 @@ export const FeedbackEntrySchema = z.object({
     subjectId: z.string().min(1),
     subjectName: z.string().optional(),
     authorId: z.string().optional(),
-    authorName: z.string().optional(),
-    authorEmployeeId: z.string().optional(),
     answers: z.array(z.any()),
     card: FeedbackCardSchema.optional(),
     createdAt: TimestampSchema.optional(),

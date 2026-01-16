@@ -349,14 +349,12 @@ curl -X POST "$BASE_URL/feedback-entries" \
     "subjectType":"Employee",
     "subjectId":"YOUR_EMPLOYEE_ID",
     "subjectName":"Jane Doe",
-    "authorId":"YOUR_USER_ID",
-    "authorName":"Your Name",
-    "authorEmployeeId":"YOUR_EMPLOYEE_ID",
+    "authorId":"YOUR_AUTHOR_EMPLOYEE_UUID",
     "answers":[{"questionId":"q1","answer":"Great"}]
   }'
 
 > [!NOTE]
-> `authorId`, `authorName`, and `authorEmployeeId` are optional in the request. If omitted, the API will automatically populate them from the authenticated user's session and employee record.
+> `authorId` is optional in the request. If omitted, the API will automatically populate it with the Employee record UUID of the authenticated user. redundant fields like `authorName` and `authorEmployeeId` are no longer stored but are returned in GET responses for convenience.
 
 ### GET /feedback-entries
 curl -X GET "$BASE_URL/feedback-entries" \

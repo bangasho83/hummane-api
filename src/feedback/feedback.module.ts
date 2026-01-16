@@ -299,19 +299,19 @@ export class FeedbackEntriesService {
     }
 
     private selectFields = [
-        'id',
-        'company_id AS "companyId"',
-        'card_id AS "cardId"',
-        'type',
-        'subject_type AS "subjectType"',
-        'subject_id AS "subjectId"',
-        'subject_name AS "subjectName"',
-        'author_id AS "authorId"',
-        'author_name AS "authorName"',
-        'author_employee_id AS "authorEmployeeId"',
-        'answers',
-        'created_at AS "createdAt"',
-        'updated_at AS "updatedAt"',
+        'fe.id',
+        'fe.company_id AS "companyId"',
+        'fe.card_id AS "cardId"',
+        'fe.type',
+        'fe.subject_type AS "subjectType"',
+        'fe.subject_id AS "subjectId"',
+        'fe.subject_name AS "subjectName"',
+        'fe.author_id AS "authorId"',
+        'author.name AS "authorName"',
+        'author.employee_id AS "authorEmployeeId"',
+        'fe.answers',
+        'fe.created_at AS "createdAt"',
+        'fe.updated_at AS "updatedAt"',
     ].join(', ');
 
     async create(data: FeedbackEntry) {
@@ -327,11 +327,9 @@ export class FeedbackEntriesService {
                     subject_id,
                     subject_name,
                     author_id,
-                    author_name,
-                    author_employee_id,
                     answers
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
-                RETURNING ${this.selectFields}`,
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
+                RETURNING id`,
                 [
                     id,
                     data.companyId,
@@ -341,13 +339,10 @@ export class FeedbackEntriesService {
                     data.subjectId,
                     data.subjectName ?? null,
                     data.authorId ?? null,
-                    data.authorName ?? null,
-                    data.authorEmployeeId ?? null,
                     JSON.stringify(data.answers ?? []),
                 ],
             );
-            const created = result.rows[0];
-            return this.applyCommentRule(created);
+            return this.findOne(result.rows[0].id, data.companyId);
         } catch (error) {
             throw new InternalServerErrorException({
                 message: 'Feedback entry create failed',
@@ -358,9 +353,10 @@ export class FeedbackEntriesService {
     async findAll(companyId: string, limit = 50) {
         const result = await this.postgres.query<FeedbackEntry>(
             `SELECT ${this.selectFields}
-             FROM feedback_entries
-             WHERE company_id = $1
-             ORDER BY created_at DESC
+             FROM feedback_entries fe
+             LEFT JOIN employees author ON author.id = fe.author_id AND author.company_id = fe.company_id
+             WHERE fe.company_id = $1
+             ORDER BY fe.created_at DESC
              LIMIT $2`,
             [companyId, limit],
         );
@@ -398,8 +394,9 @@ export class FeedbackEntriesService {
     async findOne(id: string, companyId: string) {
         const result = await this.postgres.query<FeedbackEntry>(
             `SELECT ${this.selectFields}
-             FROM feedback_entries
-             WHERE id = $1 AND company_id = $2
+             FROM feedback_entries fe
+             LEFT JOIN employees author ON author.id = fe.author_id AND author.company_id = fe.company_id
+             WHERE fe.id = $1 AND fe.company_id = $2
              LIMIT 1`,
             [id, companyId],
         );
@@ -436,14 +433,6 @@ export class FeedbackEntriesService {
             updates.push(`author_id = $${index++}`);
             values.push(data.authorId ?? null);
         }
-        if (Object.prototype.hasOwnProperty.call(data, 'authorName')) {
-            updates.push(`author_name = $${index++}`);
-            values.push(data.authorName ?? null);
-        }
-        if (Object.prototype.hasOwnProperty.call(data, 'authorEmployeeId')) {
-            updates.push(`author_employee_id = $${index++}`);
-            values.push(data.authorEmployeeId ?? null);
-        }
         if (Object.prototype.hasOwnProperty.call(data, 'answers')) {
             updates.push(`answers = $${index++}::jsonb`);
             values.push(JSON.stringify(data.answers ?? []));
@@ -453,16 +442,16 @@ export class FeedbackEntriesService {
         values.push(id, companyId);
 
         try {
-            const result = await this.postgres.query<FeedbackEntry>(
+            const result = await this.postgres.query<{ id: string }>(
                 `UPDATE feedback_entries
                  SET ${updates.join(', ')}
                  WHERE id = $${index++} AND company_id = $${index}
-                 RETURNING ${this.selectFields}`,
+                 RETURNING id`,
                 values,
             );
             const updated = result.rows[0];
             if (!updated) return null;
-            return this.applyCommentRule(updated);
+            return this.findOne(updated.id, companyId);
         } catch (error) {
             throw new InternalServerErrorException({
                 message: 'Feedback entry update failed',
@@ -520,26 +509,19 @@ export class FeedbackEntriesController {
         // 1. Force companyId from token
         d.companyId = user.companyId;
 
-        // 2. Auto-populate author information if missing
-        if (!d.authorId) d.authorId = user.id;
-        if (!d.authorName && d.authorId === user.id) {
-            const fullUser = await this.usersService.findOne(user.id);
-            if (fullUser) d.authorName = fullUser.name;
-        }
-
-        // 3. Auto-populate author employee information if missing
-        if (!d.authorEmployeeId && d.authorId === user.id) {
+        // 2. Auto-populate authorId with Employee UUID if missing
+        if (!d.authorId) {
             const employee = await this.employeesService.findByUserId(user.id, user.companyId);
-            if (employee) d.authorEmployeeId = employee.employeeId;
+            if (employee) d.authorId = employee.id;
         }
 
-        // 4. Validate and retrieve clean data
+        // 3. Validate and retrieve clean data
         const v = FeedbackEntrySchema.safeParse(d);
         if (!v.success) {
             throw new BadRequestException(v.error.issues);
         }
 
-        // 5. Persist validated data
+        // 4. Persist validated data
         return this.service.create(v.data as FeedbackEntry);
     }
     @Get() findAll(@Req() req, @Query('limit') limit?: string) { return this.service.findAll(req.user.companyId, parseLimit(limit)); }
