@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS employees (
   gender text NOT NULL,
   salary numeric(12, 2),
   photo_url text,
+  dob date,
+  personal_details jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, employee_id)

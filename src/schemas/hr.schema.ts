@@ -24,6 +24,29 @@ const DocumentFilesSchema = z.object({
     files: z.array(z.string()),
 });
 
+export const EmployeePersonalDetailsSchema = z.object({
+    personalInfo: z.object({
+        email: z.string().email().optional(),
+        number: z.string().optional(),
+    }).optional(),
+    nationalId: z.string().optional(),
+    address: z.object({
+        permanentAddress: z.string().optional(),
+        temporaryAddress: z.string().optional(),
+    }).optional(),
+    emergencyContact: z.object({
+        relation: z.string().optional(),
+        name: z.string().optional(),
+        number: z.string().optional(),
+    }).optional(),
+    bloodGroup: z.string().optional(),
+    bankAccount: z.object({
+        title: z.string().optional(),
+        bankName: z.string().optional(),
+        accountNumber: z.string().optional(),
+    }).optional(),
+});
+
 export const EmployeeSchema = z.object({
     id: z.string().optional(),
     employeeId: z.string().min(1),
@@ -43,6 +66,8 @@ export const EmployeeSchema = z.object({
     gender: GenderEnum,
     salary: TwoDecimalNumberSchema.optional(),
     photoUrl: z.string().url().optional().or(z.string().length(0)),
+    dob: IsoDateSchema.optional().or(z.string().length(0)),
+    personalDetails: EmployeePersonalDetailsSchema.optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });

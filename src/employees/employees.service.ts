@@ -31,6 +31,8 @@ export class EmployeesService {
         'e.gender',
         'e.salary',
         'e.photo_url AS "photoUrl"',
+        'e.dob',
+        'e.personal_details AS "personalDetails"',
         'e.created_at AS "createdAt"',
         'e.updated_at AS "updatedAt"',
     ].join(', ');
@@ -51,10 +53,11 @@ export class EmployeesService {
                 employment_type,
                 employment_mode,
                 reporting_manager_id,
-                gender,
                 salary,
-                photo_url
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                photo_url,
+                dob,
+                personal_details
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING ${this.selectFields}`,
             [
                 id,
@@ -72,6 +75,8 @@ export class EmployeesService {
                 data.gender,
                 data.salary ?? null,
                 data.photoUrl ?? null,
+                data.dob ?? null,
+                data.personalDetails ? JSON.stringify(data.personalDetails) : null,
             ],
         );
         return this.findOne(id, data.companyId) as Promise<Employee>;
@@ -182,6 +187,14 @@ export class EmployeesService {
         if (Object.prototype.hasOwnProperty.call(updateData, 'photoUrl')) {
             updates.push(`photo_url = $${index++}`);
             values.push(updateData.photoUrl ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'dob')) {
+            updates.push(`dob = $${index++}`);
+            values.push(updateData.dob ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'personalDetails')) {
+            updates.push(`personal_details = $${index++}`);
+            values.push(updateData.personalDetails ? JSON.stringify(updateData.personalDetails) : null);
         }
 
         updates.push('updated_at = now()');
