@@ -108,7 +108,7 @@ curl -X DELETE "$BASE_URL/companies/YOUR_COMPANY_ID" \
 curl -X POST "$BASE_URL/employees" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"employeeId":"EMP-001","companyId":"YOUR_COMPANY_ID","userId":"YOUR_USER_ID","departmentId":"YOUR_DEPARTMENT_ID","reportingManagerId":"YOUR_MANAGER_EMPLOYEE_ID","name":"Jane Doe","email":"jane@example.com","startDate":"2024-01-01","employmentType":"Full-time","employmentMode":"Onsite","gender":"Female"}'
+  -d '{"employeeId":"EMP-001","companyId":"YOUR_COMPANY_ID","userId":"YOUR_USER_ID","departmentId":"YOUR_DEPARTMENT_ID","reportingManagerId":"YOUR_MANAGER_EMPLOYEE_ID","name":"Jane Doe","email":"jane@example.com","startDate":"2024-01-01","employmentType":"Full-time","employmentMode":"Onsite","gender":"Female","photoUrl":"https://example.com/jane-doe.jpg"}'
 
 ### GET /employees
 curl -X GET "$BASE_URL/employees" \
@@ -122,7 +122,7 @@ curl -X GET "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
 curl -X PUT "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"companyId":"YOUR_COMPANY_ID","userId":"YOUR_USER_ID","departmentId":"YOUR_DEPARTMENT_ID","employmentType":"Full-time","employmentMode":"Hybrid"}'
+  -d '{"companyId":"YOUR_COMPANY_ID","userId":"YOUR_USER_ID","departmentId":"YOUR_DEPARTMENT_ID","employmentType":"Full-time","employmentMode":"Hybrid","photoUrl":"https://example.com/jane-updated.jpg"}'
 
 ### DELETE /employees/:id
 curl -X DELETE "$BASE_URL/employees/YOUR_EMPLOYEE_ID" \

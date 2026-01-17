@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS employees (
   reporting_manager_id uuid,
   gender text NOT NULL,
   salary numeric(12, 2),
+  photo_url text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, employee_id)

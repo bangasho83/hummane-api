@@ -30,6 +30,7 @@ export class EmployeesService {
         'm.name AS "reportingManagerName"',
         'e.gender',
         'e.salary',
+        'e.photo_url AS "photoUrl"',
         'e.created_at AS "createdAt"',
         'e.updated_at AS "updatedAt"',
     ].join(', ');
@@ -51,9 +52,10 @@ export class EmployeesService {
                 employment_mode,
                 reporting_manager_id,
                 gender,
-                salary
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-            RETURNING id`,
+                salary,
+                photo_url
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+            RETURNING ${this.selectFields}`,
             [
                 id,
                 data.employeeId,
@@ -69,6 +71,7 @@ export class EmployeesService {
                 data.reportingManagerId ?? null,
                 data.gender,
                 data.salary ?? null,
+                data.photoUrl ?? null,
             ],
         );
         return this.findOne(id, data.companyId) as Promise<Employee>;
@@ -175,6 +178,10 @@ export class EmployeesService {
         if (Object.prototype.hasOwnProperty.call(updateData, 'salary')) {
             updates.push(`salary = $${index++}`);
             values.push(updateData.salary ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'photoUrl')) {
+            updates.push(`photo_url = $${index++}`);
+            values.push(updateData.photoUrl ?? null);
         }
 
         updates.push('updated_at = now()');
