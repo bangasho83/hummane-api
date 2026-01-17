@@ -53,12 +53,13 @@ export class EmployeesService {
                 employment_type,
                 employment_mode,
                 reporting_manager_id,
+                gender,
                 salary,
                 photo_url,
                 dob,
                 personal_details
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-            RETURNING ${this.selectFields}`,
+            RETURNING id`,
             [
                 id,
                 data.employeeId,
