@@ -12,11 +12,13 @@ export class JobsService {
 
     private selectFields = [
         'id',
-        'company_id AS "companyId"',
-        'title',
-        'role_id AS "roleId"',
-        'department_id AS "departmentId"',
-        'employment_type AS "employmentType"',
+        'j.company_id AS "companyId"',
+        'j.title',
+        'j.role_id AS "roleId"',
+        'r.title AS "roleName"',
+        'j.department_id AS "departmentId"',
+        'd.name AS "departmentName"',
+        'j.employment_type AS "employmentType"',
         'employment_mode AS "employmentMode"',
         'city',
         'country',
@@ -71,6 +73,8 @@ export class JobsService {
         const result = await this.postgres.query<Job>(
             `SELECT ${this.selectFields}
              FROM jobs j
+             LEFT JOIN roles r ON r.id = j.role_id AND r.company_id = j.company_id
+             LEFT JOIN departments d ON d.id = j.department_id AND d.company_id = j.company_id
              WHERE j.company_id = $1
              ORDER BY j.created_at DESC
              LIMIT $2`,
@@ -83,6 +87,8 @@ export class JobsService {
         const result = await this.postgres.query<Job>(
             `SELECT ${this.selectFields}
              FROM jobs j
+             LEFT JOIN roles r ON r.id = j.role_id AND r.company_id = j.company_id
+             LEFT JOIN departments d ON d.id = j.department_id AND d.company_id = j.company_id
              WHERE j.id = $1 AND j.company_id = $2
              LIMIT 1`,
             [id, companyId],

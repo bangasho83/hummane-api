@@ -197,6 +197,8 @@ Example response:
   {
     "id": "...",
     "title": "Backend Engineer",
+    "roleName": "Software Engineer",
+    "departmentName": "Engineering",
     "applicantCount": 5,
     ...
   }
