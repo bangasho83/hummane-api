@@ -228,6 +228,10 @@ curl -X POST "$BASE_URL/applicants" \
 curl -X GET "$BASE_URL/applicants" \
   -H "Authorization: Bearer $TOKEN"
 
+### GET /applicants (Filtered by Job)
+curl -X GET "$BASE_URL/applicants?jobId=YOUR_JOB_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
 ### GET /applicants/:id
 curl -X GET "$BASE_URL/applicants/YOUR_APPLICANT_ID" \
   -H "Authorization: Bearer $TOKEN"

@@ -75,15 +75,18 @@ export class ApplicantsService {
         return result.rows[0];
     }
 
-    async findAll(companyId: string, limit = 50) {
-        const result = await this.postgres.query<Applicant>(
-            `SELECT ${this.selectFields}
-             FROM applicants
-             WHERE company_id = $1
-             ORDER BY created_at DESC
-             LIMIT $2`,
-            [companyId, limit],
-        );
+    async findAll(companyId: string, limit = 50, jobId?: string) {
+        let query = `SELECT ${this.selectFields} FROM applicants WHERE company_id = $1`;
+        const params: any[] = [companyId, limit];
+
+        if (jobId) {
+            query += ` AND job_id = $3`;
+            params.push(jobId);
+        }
+
+        query += ` ORDER BY created_at DESC LIMIT $2`;
+
+        const result = await this.postgres.query<Applicant>(query, params);
         return result.rows;
     }
 
@@ -203,8 +206,8 @@ export class ApplicantsController {
     }
 
     @Get()
-    findAll(@Req() req, @Query('limit') limit?: string) {
-        return this.service.findAll(req.user.companyId, parseLimit(limit));
+    findAll(@Req() req, @Query('limit') limit?: string, @Query('jobId') jobId?: string) {
+        return this.service.findAll(req.user.companyId, parseLimit(limit), jobId);
     }
 
     @Get(':id')
