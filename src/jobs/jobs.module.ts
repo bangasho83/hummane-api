@@ -11,7 +11,7 @@ export class JobsService {
     constructor(private postgres: PostgresService) { }
 
     private selectFields = [
-        'id',
+        'j.id',
         'j.company_id AS "companyId"',
         'j.title',
         'j.role_id AS "roleId"',
@@ -19,16 +19,16 @@ export class JobsService {
         'j.department_id AS "departmentId"',
         'd.name AS "departmentName"',
         'j.employment_type AS "employmentType"',
-        'employment_mode AS "employmentMode"',
-        'city',
-        'country',
-        'salary_from AS "salaryFrom"',
-        'salary_to AS "salaryTo"',
-        'experience',
-        'status',
+        'j.employment_mode AS "employmentMode"',
+        'j.city',
+        'j.country',
+        'j.salary_from AS "salaryFrom"',
+        'j.salary_to AS "salaryTo"',
+        'j.experience',
+        'j.status',
         '(SELECT COUNT(*)::int FROM applicants a WHERE a.job_id = j.id) AS "applicantCount"',
-        'created_at AS "createdAt"',
-        'updated_at AS "updatedAt"',
+        'j.created_at AS "createdAt"',
+        'j.updated_at AS "updatedAt"',
     ].join(', ');
 
     async create(data: Job) {
