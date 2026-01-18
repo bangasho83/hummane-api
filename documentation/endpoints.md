@@ -191,6 +191,18 @@ curl -X POST "$BASE_URL/jobs" \
 curl -X GET "$BASE_URL/jobs" \
   -H "Authorization: Bearer $TOKEN"
 
+Example response:
+```json
+[
+  {
+    "id": "...",
+    "title": "Backend Engineer",
+    "applicantCount": 5,
+    ...
+  }
+]
+```
+
 ### GET /jobs/:id
 curl -X GET "$BASE_URL/jobs/YOUR_JOB_ID" \
   -H "Authorization: Bearer $TOKEN"

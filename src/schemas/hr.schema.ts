@@ -103,6 +103,7 @@ export const JobSchema = z.object({
     salaryTo: z.number().int().optional(),
     experience: z.string().optional(),
     status: JobStatusEnum,
+    applicantCount: z.number().int().optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });

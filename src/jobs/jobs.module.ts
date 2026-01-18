@@ -23,6 +23,7 @@ export class JobsService {
         'salary_to AS "salaryTo"',
         'experience',
         'status',
+        '(SELECT COUNT(*)::int FROM applicants a WHERE a.job_id = j.id) AS "applicantCount"',
         'created_at AS "createdAt"',
         'updated_at AS "updatedAt"',
     ].join(', ');
@@ -66,9 +67,9 @@ export class JobsService {
     async findAll(companyId: string, limit = 50) {
         const result = await this.postgres.query<Job>(
             `SELECT ${this.selectFields}
-             FROM jobs
-             WHERE company_id = $1
-             ORDER BY created_at DESC
+             FROM jobs j
+             WHERE j.company_id = $1
+             ORDER BY j.created_at DESC
              LIMIT $2`,
             [companyId, limit],
         );
@@ -78,8 +79,8 @@ export class JobsService {
     async findOne(id: string, companyId: string) {
         const result = await this.postgres.query<Job>(
             `SELECT ${this.selectFields}
-             FROM jobs
-             WHERE id = $1 AND company_id = $2
+             FROM jobs j
+             WHERE j.id = $1 AND j.company_id = $2
              LIMIT 1`,
             [id, companyId],
         );
