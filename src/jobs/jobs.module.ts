@@ -18,7 +18,8 @@ export class JobsService {
         'department_id AS "departmentId"',
         'employment_type AS "employmentType"',
         'employment_mode AS "employmentMode"',
-        'location',
+        'city',
+        'country',
         'salary_from AS "salaryFrom"',
         'salary_to AS "salaryTo"',
         'experience',
@@ -39,13 +40,14 @@ export class JobsService {
                 department_id,
                 employment_type,
                 employment_mode,
-                location,
+                city,
+                country,
                 salary_from,
                 salary_to,
                 experience,
                 status
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-            RETURNING ${this.selectFields}`,
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            RETURNING id`,
             [
                 id,
                 data.companyId,
@@ -54,7 +56,8 @@ export class JobsService {
                 data.departmentId ?? null,
                 data.employmentType ?? null,
                 data.employmentMode ?? null,
-                data.location ?? null,
+                data.city ?? null,
+                data.country ?? null,
                 data.salaryFrom ?? null,
                 data.salaryTo ?? null,
                 data.experience ?? null,
@@ -112,9 +115,13 @@ export class JobsService {
             updates.push(`employment_mode = $${index++}`);
             values.push(data.employmentMode ?? null);
         }
-        if (Object.prototype.hasOwnProperty.call(data, 'location')) {
-            updates.push(`location = $${index++}`);
-            values.push(data.location ?? null);
+        if (Object.prototype.hasOwnProperty.call(data, 'city')) {
+            updates.push(`city = $${index++}`);
+            values.push(data.city ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'country')) {
+            updates.push(`country = $${index++}`);
+            values.push(data.country ?? null);
         }
         if (Object.prototype.hasOwnProperty.call(data, 'salaryFrom')) {
             updates.push(`salary_from = $${index++}`);

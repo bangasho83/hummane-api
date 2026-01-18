@@ -185,7 +185,7 @@ curl -X DELETE "$BASE_URL/roles/YOUR_ROLE_ID" \
 curl -X POST "$BASE_URL/jobs" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Backend Engineer","departmentId":"YOUR_DEPARTMENT_ID","status":"open","employmentType":"Full-time","employmentMode":"Remote","salaryFrom":60000,"salaryTo":85000,"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"title":"Backend Engineer","departmentId":"YOUR_DEPARTMENT_ID","status":"open","employmentType":"Full-time","employmentMode":"Remote","city":"London","country":"United Kingdom","salaryFrom":60000,"salaryTo":85000,"companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /jobs
 curl -X GET "$BASE_URL/jobs" \
@@ -211,7 +211,7 @@ curl -X GET "$BASE_URL/jobs/YOUR_JOB_ID" \
 curl -X PUT "$BASE_URL/jobs/YOUR_JOB_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"status":"closed","departmentId":"YOUR_DEPARTMENT_ID","employmentMode":"Hybrid","salaryTo":90000,"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"status":"closed","departmentId":"YOUR_DEPARTMENT_ID","employmentMode":"Hybrid","city":"Manchester","salaryTo":90000,"companyId":"YOUR_COMPANY_ID"}'
 
 ### DELETE /jobs/:id
 curl -X DELETE "$BASE_URL/jobs/YOUR_JOB_ID" \
