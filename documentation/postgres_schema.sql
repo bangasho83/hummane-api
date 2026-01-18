@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   city text,
   country text,
   salary_from numeric(12, 2),
-  salary_to integer,
+  salary_to numeric(12, 2),
   experience text,
   status text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),

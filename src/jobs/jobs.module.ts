@@ -149,14 +149,16 @@ export class JobsService {
         updates.push('updated_at = now()');
         values.push(id, companyId);
 
-        const result = await this.postgres.query<Job>(
+        const result = await this.postgres.query<{ id: string }>(
             `UPDATE jobs
              SET ${updates.join(', ')}
              WHERE id = $${index++} AND company_id = $${index}
-             RETURNING ${this.selectFields}`,
+             RETURNING id`,
             values,
         );
-        return result.rows[0] ?? null;
+        const updated = result.rows[0];
+        if (!updated) return null;
+        return this.findOne(id, companyId);
     }
 
     async delete(id: string, companyId: string) {
