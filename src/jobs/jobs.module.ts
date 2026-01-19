@@ -33,7 +33,7 @@ export class JobsService {
 
     async create(data: Job) {
         const id = data.id || uuidv4();
-        const result = await this.postgres.query<Job>(
+        const result = await this.postgres.query<{ id: string }>(
             `INSERT INTO jobs (
                 id,
                 company_id,
@@ -66,7 +66,7 @@ export class JobsService {
                 data.status,
             ],
         );
-        return result.rows[0];
+        return this.findOne(id, data.companyId);
     }
 
     async findAll(companyId: string, limit = 50) {
