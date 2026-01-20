@@ -17,7 +17,7 @@ export class ApplicantsService {
         'a.full_name AS "fullName"',
         'a.email',
         'a.phone',
-        'COALESCE(a.position_applied, j.title) AS "positionApplied"',
+        'j.title AS "positionApplied"',
         'j.department_id AS "departmentId"',
         'd.name AS "departmentName"',
         'a.years_of_experience AS "yearsOfExperience"',
