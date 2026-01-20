@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS companies (
   currency text,
   timezone text,
   working_hours jsonb,
+  api_key text UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );

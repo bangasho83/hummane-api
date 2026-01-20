@@ -15,6 +15,7 @@ import { HolidaysModule } from './holidays/holidays.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { DocumentsModule } from './documents/documents.module';
 import { InvitationsModule } from './invitations/invitations.module';
+import { PublicModule } from './public/public.module';
 
 @Module({
     imports: [
@@ -36,6 +37,7 @@ import { InvitationsModule } from './invitations/invitations.module';
         FeedbackModule,
         DocumentsModule,
         InvitationsModule,
+        PublicModule,
     ],
     controllers: [],
     providers: [],

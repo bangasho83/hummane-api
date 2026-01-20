@@ -463,3 +463,32 @@ curl -X GET "$BASE_URL/documents/YOUR_DOCUMENT_ID" \
 ### DELETE /documents/:id
 curl -X DELETE "$BASE_URL/documents/YOUR_DOCUMENT_ID" \
   -H "Authorization: Bearer $TOKEN"
+
+## Public API
+Public endpoints for use on external company portals. Authentication is handled via the `x-api-key` header.
+
+### GET /public/jobs
+Fetch all open jobs for a company.
+
+```bash
+curl -X GET "$BASE_URL/public/jobs" \
+  -H "x-api-key: YOUR_API_KEY"
+```
+
+### POST /public/applicants
+Submit a new application for a specific job.
+
+```bash
+curl -X POST "$BASE_URL/public/applicants" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jobId": "...",
+    "fullName": "Jane Doe",
+    "email": "jane@example.com",
+    "phone": "+123456789",
+    "appliedDate": "2024-01-20",
+    "status": "new"
+  }'
+```
+
