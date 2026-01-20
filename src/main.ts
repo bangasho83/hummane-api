@@ -8,6 +8,17 @@ async function bootstrap() {
         new FastifyAdapter()
     );
 
+    // Register multipart support
+    await app.register(require('@fastify/multipart'), {
+        limits: {
+            fieldNameSize: 100, // Max field name size in bytes
+            fieldSize: 100,     // Max field value size in bytes
+            fields: 20,         // Max number of non-file fields
+            fileSize: 5242880,  // 5MB
+            files: 1,           // Max number of file fields
+        },
+    });
+
     app.enableCors({
         origin: true,
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',

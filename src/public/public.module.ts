@@ -3,13 +3,16 @@ import { ApiKeyGuard } from '../auth/api-key.guard';
 import { JobsService } from '../jobs/jobs.module';
 import { ApplicantsService } from '../applicants/applicants.module';
 import { ApplicantSchema, Applicant } from '../schemas/hr.schema';
+import { StorageService } from '../storage/storage.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Controller('public')
 @UseGuards(ApiKeyGuard)
 export class PublicController {
     constructor(
         private jobsService: JobsService,
-        private applicantsService: ApplicantsService
+        private applicantsService: ApplicantsService,
+        private storageService: StorageService
     ) { }
 
     @Get('jobs')
@@ -36,9 +39,41 @@ export class PublicController {
     }
 
     @Post('applicants')
-    async createApplicant(@Body() data: Applicant, @Req() req) {
+    async createApplicant(@Req() req) {
         const companyId = req.companyId;
-        data.companyId = companyId;
+
+        // Since we registered @fastify/multipart, we can use req.file() or req.parts()
+        // We'll use parts to handle both fields and the file
+        const parts = req.parts();
+        const data: any = { companyId };
+        let resumeUrl: string | undefined;
+
+        for await (const part of parts) {
+            if (part.file) {
+                // Handle file
+                const buffer = await part.toBuffer();
+                const fileName = `${uuidv4()}_${part.filename}`;
+                resumeUrl = await this.storageService.uploadFile(
+                    buffer,
+                    `applicants`,
+                    fileName,
+                    part.mimetype
+                );
+            } else {
+                // Handle field
+                // Fastify multipart fields are strings, but our schema expects numbers for some fields
+                // We'll parse them later or let Zod handle it if we cast
+                data[part.fieldname] = part.value;
+            }
+        }
+
+        // Convert types for Zod (Fastify multipart sends everything as strings)
+        if (data.yearsOfExperience) data.yearsOfExperience = parseFloat(data.yearsOfExperience);
+        if (data.currentSalary) data.currentSalary = parseInt(data.currentSalary, 10);
+        if (data.expectedSalary) data.expectedSalary = parseInt(data.expectedSalary, 10);
+        if (resumeUrl) data.resumeFile = resumeUrl;
+        if (!data.appliedDate) data.appliedDate = new Date().toISOString().split('T')[0];
+        if (!data.status) data.status = 'new';
 
         // Basic validation
         const v = ApplicantSchema.safeParse(data);
@@ -51,8 +86,8 @@ export class PublicController {
 }
 
 @Module({
-    imports: [], // JobsModule and ApplicantsModule are already exported from their own modules
+    imports: [StorageModule],
     controllers: [PublicController],
-    providers: [JobsService, ApplicantsService], // We can inject them if they are providers in this module or if we import their modules
+    providers: [JobsService, ApplicantsService],
 })
 export class PublicModule { }
