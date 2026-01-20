@@ -13,9 +13,24 @@ export class PublicController {
     ) { }
 
     @Get('jobs')
-    async getJobs(@Req() req, @Query('jobId') jobId?: string) {
+    async getJobs(
+        @Req() req,
+        @Query('jobId') jobId?: string,
+        @Query('city') city?: string,
+        @Query('country') country?: string,
+        @Query('employmentMode') employmentMode?: string,
+        @Query('employmentType') employmentType?: string,
+        @Query('departmentId') departmentId?: string,
+    ) {
         const companyId = req.companyId;
-        const jobs = await this.jobsService.findAll(companyId, 50, jobId);
+        const jobs = await this.jobsService.findAll(companyId, 50, {
+            jobId,
+            city,
+            country,
+            employmentMode,
+            employmentType,
+            departmentId,
+        });
         // Only return open jobs and necessary public fields
         return jobs.filter(job => job.status === 'open');
     }

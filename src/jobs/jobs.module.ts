@@ -69,17 +69,52 @@ export class JobsService {
         return this.findOne(id, data.companyId);
     }
 
-    async findAll(companyId: string, limit = 50, jobId?: string) {
+    async findAll(companyId: string, limit = 50, filters: {
+        jobId?: string;
+        city?: string;
+        country?: string;
+        employmentMode?: string;
+        employmentType?: string;
+        departmentId?: string;
+    } = {}) {
+        const updates: string[] = ['j.company_id = $1'];
+        const values: any[] = [companyId, limit];
+        let index = 3;
+
+        if (filters.jobId) {
+            updates.push(`j.id = $${index++}`);
+            values.push(filters.jobId);
+        }
+        if (filters.city) {
+            updates.push(`j.city = $${index++}`);
+            values.push(filters.city);
+        }
+        if (filters.country) {
+            updates.push(`j.country = $${index++}`);
+            values.push(filters.country);
+        }
+        if (filters.employmentMode) {
+            updates.push(`j.employment_mode = $${index++}`);
+            values.push(filters.employmentMode);
+        }
+        if (filters.employmentType) {
+            updates.push(`j.employment_type = $${index++}`);
+            values.push(filters.employmentType);
+        }
+        if (filters.departmentId) {
+            updates.push(`j.department_id = $${index++}`);
+            values.push(filters.departmentId);
+        }
+
         const result = await this.postgres.query<Job>(
             `SELECT ${this.selectFields}
              FROM jobs j
              LEFT JOIN roles r ON r.id = j.role_id AND r.company_id = j.company_id
              LEFT JOIN departments d ON d.id = j.department_id AND d.company_id = j.company_id
-             WHERE j.company_id = $1
-             ${jobId ? 'AND j.id = $3' : ''}
+             WHERE ${updates.join(' AND ')}
              ORDER BY j.created_at DESC
              LIMIT $2`,
-            jobId ? [companyId, limit, jobId] : [companyId, limit],
+            values,
         );
         return result.rows;
     }

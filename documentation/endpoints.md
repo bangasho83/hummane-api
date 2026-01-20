@@ -488,6 +488,11 @@ curl -X GET "$BASE_URL/public/jobs" \
 Fetch a specific job by its ID.
 curl -X GET "$BASE_URL/public/jobs?jobId=YOUR_JOB_ID" \
   -H "x-api-key: YOUR_API_KEY"
+
+### GET /public/jobs (With Filters)
+Filter jobs by city, country, employment mode, type, or department.
+curl -X GET "$BASE_URL/public/jobs?city=London&employmentMode=Remote&employmentType=Full-time" \
+  -H "x-api-key: YOUR_API_KEY"
 ```
 
 ### POST /public/applicants
