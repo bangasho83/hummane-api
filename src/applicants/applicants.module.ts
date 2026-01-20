@@ -18,6 +18,8 @@ export class ApplicantsService {
         'a.email',
         'a.phone',
         'COALESCE(a.position_applied, j.title) AS "positionApplied"',
+        'j.department_id AS "departmentId"',
+        'd.name AS "departmentName"',
         'a.years_of_experience AS "yearsOfExperience"',
         'a.current_salary AS "currentSalary"',
         'a.expected_salary AS "expectedSalary"',
@@ -79,6 +81,7 @@ export class ApplicantsService {
             SELECT ${this.selectFields} 
             FROM applicants a
             LEFT JOIN jobs j ON j.id = a.job_id
+            LEFT JOIN departments d ON d.id = j.department_id
             WHERE a.company_id = $1`;
 
         const params: any[] = [companyId, limit];
@@ -99,6 +102,7 @@ export class ApplicantsService {
             `SELECT ${this.selectFields}
              FROM applicants a
              LEFT JOIN jobs j ON j.id = a.job_id
+             LEFT JOIN departments d ON d.id = j.department_id
              WHERE a.id = $1 AND a.company_id = $2
              LIMIT 1`,
             [id, companyId],
