@@ -1,4 +1,4 @@
-import { BadRequestException, Module, Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException, Module, Controller, Get, Post, Body, UseGuards, Req, Query } from '@nestjs/common';
 import { ApiKeyGuard } from '../auth/api-key.guard';
 import { JobsService } from '../jobs/jobs.module';
 import { ApplicantsService } from '../applicants/applicants.module';
@@ -13,9 +13,9 @@ export class PublicController {
     ) { }
 
     @Get('jobs')
-    async getJobs(@Req() req) {
+    async getJobs(@Req() req, @Query('jobId') jobId?: string) {
         const companyId = req.companyId;
-        const jobs = await this.jobsService.findAll(companyId);
+        const jobs = await this.jobsService.findAll(companyId, 50, jobId);
         // Only return open jobs and necessary public fields
         return jobs.filter(job => job.status === 'open');
     }

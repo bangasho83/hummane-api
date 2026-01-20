@@ -483,6 +483,11 @@ Fetch all open jobs for a company.
 ```bash
 curl -X GET "$BASE_URL/public/jobs" \
   -H "x-api-key: YOUR_API_KEY"
+
+### GET /public/jobs?jobId=...
+Fetch a specific job by its ID.
+curl -X GET "$BASE_URL/public/jobs?jobId=YOUR_JOB_ID" \
+  -H "x-api-key: YOUR_API_KEY"
 ```
 
 ### POST /public/applicants
