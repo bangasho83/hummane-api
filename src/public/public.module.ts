@@ -52,7 +52,9 @@ export class PublicController {
                 if (part.file) {
                     console.log(`[PublicController] Processing file: ${part.filename}`);
                     const buffer = await part.toBuffer();
-                    const fileName = `${uuidv4()}_${part.filename}`;
+                    // Normalize filename: replace spaces and special characters with underscores
+                    const normalizedFilename = part.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+                    const fileName = `${uuidv4()}_${normalizedFilename}`;
                     resumeUrl = await this.storageService.uploadFile(
                         buffer,
                         `applicants`,
