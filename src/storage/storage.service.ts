@@ -22,18 +22,25 @@ export class StorageService {
 
     async uploadFile(file: Buffer, path: string, fileName: string, contentType: string): Promise<string> {
         const fullPath = `${path}/${fileName}`;
-        const fileRef = this.bucket.file(fullPath);
+        console.log(`[StorageService] Starting upload: ${fullPath} (${contentType}, ${file.length} bytes)`);
 
-        await fileRef.save(file, {
-            metadata: {
-                contentType: contentType,
-            },
-            public: true,
-        });
+        try {
+            const fileRef = this.bucket.file(fullPath);
 
-        // Construct the public URL
-        // Firebase Storage URLs follow this pattern:
-        // https://storage.googleapis.com/[BUCKET_NAME]/[FILE_PATH]
-        return `https://storage.googleapis.com/${this.bucket.name}/${fullPath}`;
+            await fileRef.save(file, {
+                metadata: {
+                    contentType: contentType,
+                },
+                public: true,
+            });
+
+            console.log(`[StorageService] Upload successful: ${fullPath}`);
+
+            // Construct the public URL
+            return `https://storage.googleapis.com/${this.bucket.name}/${fullPath}`;
+        } catch (error) {
+            console.error(`[StorageService] Upload failed for ${fullPath}:`, error);
+            throw error;
+        }
     }
 }

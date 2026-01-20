@@ -4,6 +4,7 @@ import { JobsService } from '../jobs/jobs.module';
 import { ApplicantsService } from '../applicants/applicants.module';
 import { ApplicantSchema, Applicant } from '../schemas/hr.schema';
 import { StorageService } from '../storage/storage.service';
+import { StorageModule } from '../storage/storage.module';
 import { v4 as uuidv4 } from 'uuid';
 
 @Controller('public')
@@ -40,48 +41,60 @@ export class PublicController {
 
     @Post('applicants')
     async createApplicant(@Req() req) {
-        const companyId = req.companyId;
+        console.log('[PublicController] createApplicant request received');
+        try {
+            const companyId = req.companyId;
+            const parts = req.parts();
+            const data: any = { companyId };
+            let resumeUrl: string | undefined;
 
-        // Since we registered @fastify/multipart, we can use req.file() or req.parts()
-        // We'll use parts to handle both fields and the file
-        const parts = req.parts();
-        const data: any = { companyId };
-        let resumeUrl: string | undefined;
-
-        for await (const part of parts) {
-            if (part.file) {
-                // Handle file
-                const buffer = await part.toBuffer();
-                const fileName = `${uuidv4()}_${part.filename}`;
-                resumeUrl = await this.storageService.uploadFile(
-                    buffer,
-                    `applicants`,
-                    fileName,
-                    part.mimetype
-                );
-            } else {
-                // Handle field
-                // Fastify multipart fields are strings, but our schema expects numbers for some fields
-                // We'll parse them later or let Zod handle it if we cast
-                data[part.fieldname] = part.value;
+            for await (const part of parts) {
+                if (part.file) {
+                    console.log(`[PublicController] Processing file: ${part.filename}`);
+                    const buffer = await part.toBuffer();
+                    const fileName = `${uuidv4()}_${part.filename}`;
+                    resumeUrl = await this.storageService.uploadFile(
+                        buffer,
+                        `applicants`,
+                        fileName,
+                        part.mimetype
+                    );
+                } else {
+                    console.log(`[PublicController] Processing field: ${part.fieldname} = ${part.value}`);
+                    data[part.fieldname] = part.value;
+                }
             }
+
+            console.log('[PublicController] All parts processed, preparing data...');
+
+            // Convert types for Zod
+            if (data.yearsOfExperience) data.yearsOfExperience = parseFloat(data.yearsOfExperience);
+            if (data.currentSalary) data.currentSalary = parseInt(data.currentSalary, 10);
+            if (data.expectedSalary) data.expectedSalary = parseInt(data.expectedSalary, 10);
+            if (resumeUrl) data.resumeFile = resumeUrl;
+            if (!data.appliedDate) data.appliedDate = new Date().toISOString().split('T')[0];
+            if (!data.status) data.status = 'new';
+
+            console.log('[PublicController] Validating data with Zod...');
+            const v = ApplicantSchema.safeParse(data);
+            if (!v.success) {
+                console.warn('[PublicController] Validation failed:', v.error.issues);
+                throw new BadRequestException(v.error.issues);
+            }
+
+            console.log('[PublicController] Calling ApplicantsService.create...');
+            const result = await this.applicantsService.create(v.data as Applicant);
+            console.log('[PublicController] Applicant created successfully');
+            return result;
+        } catch (error) {
+            console.error('[PublicController] Error in createApplicant:', error);
+            if (error instanceof BadRequestException) throw error;
+            throw new BadRequestException({
+                message: 'An error occurred while processing your application.',
+                error: error.message,
+                stack: error.stack
+            });
         }
-
-        // Convert types for Zod (Fastify multipart sends everything as strings)
-        if (data.yearsOfExperience) data.yearsOfExperience = parseFloat(data.yearsOfExperience);
-        if (data.currentSalary) data.currentSalary = parseInt(data.currentSalary, 10);
-        if (data.expectedSalary) data.expectedSalary = parseInt(data.expectedSalary, 10);
-        if (resumeUrl) data.resumeFile = resumeUrl;
-        if (!data.appliedDate) data.appliedDate = new Date().toISOString().split('T')[0];
-        if (!data.status) data.status = 'new';
-
-        // Basic validation
-        const v = ApplicantSchema.safeParse(data);
-        if (!v.success) {
-            throw new BadRequestException(v.error.issues);
-        }
-
-        return this.applicantsService.create(v.data as Applicant);
     }
 }
 
