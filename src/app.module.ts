@@ -16,6 +16,7 @@ import { FeedbackModule } from './feedback/feedback.module';
 import { DocumentsModule } from './documents/documents.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { PublicModule } from './public/public.module';
+import { FirestoreModule } from './firestore/firestore.module';
 
 @Module({
     imports: [
@@ -38,6 +39,7 @@ import { PublicModule } from './public/public.module';
         DocumentsModule,
         InvitationsModule,
         PublicModule,
+        FirestoreModule,
     ],
     controllers: [],
     providers: [],
