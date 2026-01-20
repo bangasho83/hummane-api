@@ -4,13 +4,20 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class StorageService {
-    private bucket: any;
+    private _bucket: any;
 
-    constructor(private configService: ConfigService) {
-        // The Firebase App is initialized in FirestoreService onModuleInit
-        // Use the specific bucket requested by the user
-        const bucketName = this.configService.get<string>('FIREBASE_STORAGE_BUCKET') || 'hummane-76bcd.firebasestorage.app';
-        this.bucket = admin.storage().bucket(bucketName);
+    constructor(private configService: ConfigService) { }
+
+    private get bucket() {
+        if (!this._bucket) {
+            // Ensure Firebase is initialized
+            if (!admin.apps.length) {
+                throw new Error('[StorageService] Firebase App not initialized');
+            }
+            const bucketName = this.configService.get<string>('FIREBASE_STORAGE_BUCKET') || 'hummane-76bcd.firebasestorage.app';
+            this._bucket = admin.storage().bucket(bucketName);
+        }
+        return this._bucket;
     }
 
     async uploadFile(file: Buffer, path: string, fileName: string, contentType: string): Promise<string> {
