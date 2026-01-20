@@ -103,6 +103,16 @@ curl -X PUT "$BASE_URL/companies/YOUR_COMPANY_ID" \
 curl -X DELETE "$BASE_URL/companies/YOUR_COMPANY_ID" \
   -H "Authorization: Bearer $TOKEN"
 
+### POST /companies/api-key
+Generate or rotate a secure API key for the company.
+curl -X POST "$BASE_URL/companies/api-key" \
+  -H "Authorization: Bearer $TOKEN"
+
+### GET /companies/api-key
+Retrieve the current API key for the company.
+curl -X GET "$BASE_URL/companies/api-key" \
+  -H "Authorization: Bearer $TOKEN"
+
 ## Employees
 ### POST /employees
 curl -X POST "$BASE_URL/employees" \

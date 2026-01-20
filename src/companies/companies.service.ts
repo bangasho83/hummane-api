@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { Company, CompanySchema } from '../schemas/core.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { PostgresService } from '../postgres/postgres.service';
@@ -126,5 +127,22 @@ export class CompaniesService {
             [userId],
         );
         return result.rows[0] ?? null;
+    }
+
+    async generateApiKey(companyId: string): Promise<string> {
+        const apiKey = crypto.randomBytes(32).toString('hex');
+        await this.postgres.query(
+            `UPDATE companies SET api_key = $1, updated_at = now() WHERE id = $2`,
+            [apiKey, companyId],
+        );
+        return apiKey;
+    }
+
+    async getApiKey(companyId: string): Promise<string | null> {
+        const result = await this.postgres.query<{ api_key: string }>(
+            `SELECT api_key FROM companies WHERE id = $1 LIMIT 1`,
+            [companyId],
+        );
+        return result.rows[0]?.api_key ?? null;
     }
 }

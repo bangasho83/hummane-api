@@ -79,4 +79,26 @@ export class CompaniesController {
 
         return this.companiesService.delete(id);
     }
+
+    @Post('api-key')
+    async generateApiKey(@Req() req) {
+        const user = req.user;
+        if (!user.companyId) {
+            throw new BadRequestException('User is not associated with a company');
+        }
+
+        const apiKey = await this.companiesService.generateApiKey(user.companyId);
+        return { apiKey };
+    }
+
+    @Get('api-key')
+    async getApiKey(@Req() req) {
+        const user = req.user;
+        if (!user.companyId) {
+            throw new BadRequestException('User is not associated with a company');
+        }
+
+        const apiKey = await this.companiesService.getApiKey(user.companyId);
+        return { apiKey };
+    }
 }
