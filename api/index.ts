@@ -2,19 +2,35 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from '../src/app.module';
 
+import fastifyMultipart from '@fastify/multipart';
+
 let app: NestFastifyApplication;
 
 export default async function handler(req: any, res: any) {
     if (!app) {
+        const adapter = new FastifyAdapter();
+        const fastifyInstance = adapter.getInstance();
+
+        // Register multipart support on the underlying Fastify instance
+        await fastifyInstance.register(fastifyMultipart, {
+            limits: {
+                fieldNameSize: 100,
+                fieldSize: 10240,
+                fields: 20,
+                fileSize: 10485760, // 10MB
+                files: 1,
+            },
+        });
+
         app = await NestFactory.create<NestFastifyApplication>(
             AppModule,
-            new FastifyAdapter()
+            adapter
         );
         app.enableCors({
             origin: true,
             methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
             credentials: true,
-            allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With',
+            allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With, x-api-key',
         });
         await app.init();
     }
