@@ -11,29 +11,29 @@ export class ApplicantsService {
     constructor(private postgres: PostgresService) { }
 
     private selectFields = [
-        'id',
-        'company_id AS "companyId"',
-        'job_id AS "jobId"',
-        'full_name AS "fullName"',
-        'email',
-        'phone',
-        'position_applied AS "positionApplied"',
-        'years_of_experience AS "yearsOfExperience"',
-        'current_salary AS "currentSalary"',
-        'expected_salary AS "expectedSalary"',
-        'notice_period AS "noticePeriod"',
-        'resume_file AS "resumeFile"',
-        'linkedin_url AS "linkedinUrl"',
-        'status',
-        'applied_date AS "appliedDate"',
-        'documents',
-        'created_at AS "createdAt"',
-        'updated_at AS "updatedAt"',
+        'a.id',
+        'a.company_id AS "companyId"',
+        'a.job_id AS "jobId"',
+        'a.full_name AS "fullName"',
+        'a.email',
+        'a.phone',
+        'COALESCE(a.position_applied, j.title) AS "positionApplied"',
+        'a.years_of_experience AS "yearsOfExperience"',
+        'a.current_salary AS "currentSalary"',
+        'a.expected_salary AS "expectedSalary"',
+        'a.notice_period AS "noticePeriod"',
+        'a.resume_file AS "resumeFile"',
+        'a.linkedin_url AS "linkedinUrl"',
+        'a.status',
+        'a.applied_date AS "appliedDate"',
+        'a.documents',
+        'a.created_at AS "createdAt"',
+        'a.updated_at AS "updatedAt"',
     ].join(', ');
 
     async create(data: Applicant) {
         const id = data.id || uuidv4();
-        const result = await this.postgres.query<Applicant>(
+        await this.postgres.query(
             `INSERT INTO applicants (
                 id,
                 company_id,
@@ -51,8 +51,7 @@ export class ApplicantsService {
                 status,
                 applied_date,
                 documents
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-            RETURNING ${this.selectFields}`,
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
             [
                 id,
                 data.companyId,
@@ -72,19 +71,24 @@ export class ApplicantsService {
                 data.documents ?? null,
             ],
         );
-        return result.rows[0];
+        return this.findOne(id, data.companyId);
     }
 
     async findAll(companyId: string, limit = 50, jobId?: string) {
-        let query = `SELECT ${this.selectFields} FROM applicants WHERE company_id = $1`;
+        let query = `
+            SELECT ${this.selectFields} 
+            FROM applicants a
+            LEFT JOIN jobs j ON j.id = a.job_id
+            WHERE a.company_id = $1`;
+
         const params: any[] = [companyId, limit];
 
         if (jobId) {
-            query += ` AND job_id = $3`;
+            query += ` AND a.job_id = $3`;
             params.push(jobId);
         }
 
-        query += ` ORDER BY created_at DESC LIMIT $2`;
+        query += ` ORDER BY a.created_at DESC LIMIT $2`;
 
         const result = await this.postgres.query<Applicant>(query, params);
         return result.rows;
@@ -93,8 +97,9 @@ export class ApplicantsService {
     async findOne(id: string, companyId: string) {
         const result = await this.postgres.query<Applicant>(
             `SELECT ${this.selectFields}
-             FROM applicants
-             WHERE id = $1 AND company_id = $2
+             FROM applicants a
+             LEFT JOIN jobs j ON j.id = a.job_id
+             WHERE a.id = $1 AND a.company_id = $2
              LIMIT 1`,
             [id, companyId],
         );
@@ -166,14 +171,16 @@ export class ApplicantsService {
         updates.push('updated_at = now()');
         values.push(id, companyId);
 
-        const result = await this.postgres.query<Applicant>(
+        const result = await this.postgres.query<{ id: string }>(
             `UPDATE applicants
              SET ${updates.join(', ')}
              WHERE id = $${index++} AND company_id = $${index}
-             RETURNING ${this.selectFields}`,
+             RETURNING id`,
             values,
         );
-        return result.rows[0] ?? null;
+        const updated = result.rows[0];
+        if (!updated) return null;
+        return this.findOne(id, companyId);
     }
 
     async delete(id: string, companyId: string) {
