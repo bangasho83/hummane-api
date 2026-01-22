@@ -11,4 +11,5 @@ export interface JwtPayload {
     email: string;
     companyId?: string;
     employeeId?: string;
+    role?: 'owner' | 'member';
 }

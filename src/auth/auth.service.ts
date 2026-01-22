@@ -97,7 +97,8 @@ export class AuthService {
                 user = await this.usersService.create({
                     id: uuidv4(),
                     email: email,
-                    name: name || 'Unknown User'
+                    name: name || 'Unknown User',
+                    role: 'member'
                 });
             }
 
@@ -131,7 +132,8 @@ export class AuthService {
                 sub: user.id,
                 email: user.email,
                 companyId: user.companyId,
-                employeeId: employeeId
+                employeeId: employeeId,
+                role: (user as any).role // Use assertion until User type is fully updated in all places
             };
 
             console.log(`[AuthDebug] JWT Payload established:`, JSON.stringify(payload));

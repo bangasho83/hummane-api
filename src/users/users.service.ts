@@ -13,6 +13,7 @@ export class UsersService {
         'email',
         'password',
         'company_id AS "companyId"',
+        'role',
         'created_at AS "createdAt"',
         'updated_at AS "updatedAt"',
     ].join(', ');
@@ -20,8 +21,8 @@ export class UsersService {
     async create(userData: User): Promise<User> {
         const id = userData.id || uuidv4();
         const result = await this.postgres.query<User>(
-            `INSERT INTO users (id, name, email, password, company_id)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO users (id, name, email, password, company_id, role)
+             VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING ${this.selectFields}`,
             [
                 id,
@@ -29,6 +30,7 @@ export class UsersService {
                 userData.email,
                 userData.password ?? null,
                 userData.companyId ?? null,
+                userData.role ?? 'member',
             ],
         );
         return result.rows[0];
@@ -90,6 +92,10 @@ export class UsersService {
         if (Object.prototype.hasOwnProperty.call(updateData, 'companyId')) {
             updates.push(`company_id = $${index++}`);
             values.push(updateData.companyId ?? null);
+        }
+        if (updateData.role !== undefined) {
+            updates.push(`role = $${index++}`);
+            values.push(updateData.role);
         }
 
         updates.push('updated_at = now()');

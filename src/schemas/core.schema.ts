@@ -9,6 +9,7 @@ export const UserSchema = z.object({
     email: z.string().email(),
     password: z.string().optional(), // hashed, might not be needed if using Firebase Auth strictly, but kept for legacy
     companyId: z.string().optional(),
+    role: z.enum(['owner', 'member']).optional().default('member'),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });
