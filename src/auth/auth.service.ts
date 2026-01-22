@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { CompaniesService } from '../companies/companies.service';
 import { EmployeesService } from '../employees/employees.service';
+import { InvitationsService } from '../invitations/invitations.module';
 import { JwtPayload } from './auth.dto';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,6 +16,7 @@ export class AuthService {
         private usersService: UsersService,
         private companiesService: CompaniesService,
         private employeesService: EmployeesService,
+        private invitationsService: InvitationsService,
         private configService: ConfigService,
     ) { }
 
@@ -119,6 +121,39 @@ export class AuthService {
             if (!user.companyId || user.companyId === 'undefined') {
                 user.companyId = undefined;
                 company = null;
+            }
+
+            // 3a. Auto-Join: If user has no company, check for pending invitations
+            if (!user.companyId) {
+                const invitation = await this.invitationsService.findPendingByEmail(user.email);
+                if (invitation) {
+                    console.log(`[AuthService] Found pending invitation for ${user.email} to company ${invitation.companyId}`);
+
+                    // Update user's company and role
+                    const role = (invitation as any).role || 'member'; // Assuming potential role field in invitation or default
+                    user = await this.usersService.update(user.id, {
+                        companyId: invitation.companyId,
+                        role: role
+                    }) as any; // Cast as any because update returns possibly null but we know it exists
+
+                    // Fetch the company info
+                    company = await this.companiesService.findOne(invitation.companyId);
+
+                    // Look for existing employee record to link
+                    const employee = await this.employeesService.findOne(invitation.employeeId || '', invitation.companyId);
+                    if (employee) {
+                        await this.employeesService.update(employee.id, { userId: user.id }, invitation.companyId);
+                        console.log(`[AuthService] Linked user ${user.id} to employee ${employee.id}`);
+                    }
+
+                    // Mark invitation as accepted
+                    await this.invitationsService.update(invitation.id, {
+                        status: 'accepted',
+                        acceptedAt: new Date()
+                    }, invitation.companyId);
+
+                    console.log(`[AuthService] Auto-joined user ${user.id} to company ${invitation.companyId}`);
+                }
             }
 
             // 4. Look up employee record if user has a company

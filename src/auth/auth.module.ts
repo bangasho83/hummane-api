@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { EmployeesModule } from '../employees/employees.module';
+import { InvitationsModule } from '../invitations/invitations.module';
 import { AuthGuard } from './auth.guard';
 
 @Global()
@@ -14,6 +15,7 @@ import { AuthGuard } from './auth.guard';
         UsersModule,
         CompaniesModule,
         EmployeesModule,
+        InvitationsModule,
         ConfigModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],

@@ -107,6 +107,18 @@ export class InvitationsService {
         return row ? this.sanitize(row) : null;
     }
 
+    async findPendingByEmail(email: string) {
+        const result = await this.postgres.query<UserInvitation>(
+            `SELECT ${this.selectFields}
+             FROM user_invitations
+             WHERE email = $1 AND status = 'pending'
+             ORDER BY created_at DESC
+             LIMIT 1`,
+            [email]
+        );
+        return result.rows[0] ? this.sanitize(result.rows[0]) : null;
+    }
+
     async update(id: string, data: Partial<UserInvitation>, companyId: string) {
         const updates: string[] = [];
         const values: unknown[] = [];
