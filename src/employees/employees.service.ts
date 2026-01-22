@@ -28,6 +28,7 @@ export class EmployeesService {
         'e.employment_mode AS "employmentMode"',
         'e.reporting_manager_id AS "reportingManagerId"',
         'm.name AS "reportingManagerName"',
+        'm.email AS "reportingManagerEmail"',
         'e.gender',
         'e.salary',
         'e.photo_url AS "photoUrl"',

@@ -1,6 +1,11 @@
 import { BadRequestException, InternalServerErrorException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
+import { EmployeesService } from '../employees/employees.service';
+import { EmailService } from '../email/email.service';
+import { ConfigService, ConfigModule } from '@nestjs/config';
+import { EmployeesModule } from '../employees/employees.module';
+import { EmailModule } from '../email/email.module';
 import { LeaveDay, LeaveRecord, LeaveRecordSchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { parseLimit } from '../utils/pagination';
@@ -470,10 +475,15 @@ export class LeaveRecordsService {
 @Controller('leaves')
 @UseGuards(AuthGuard, CompanyGuard)
 export class LeaveRecordsController {
-    constructor(private service: LeaveRecordsService) { }
+    constructor(
+        private service: LeaveRecordsService,
+        private employeesService: EmployeesService,
+        private emailService: EmailService,
+        private config: ConfigService,
+    ) { }
 
     @Post()
-    create(@Body() data: LeaveRecord, @Req() req) {
+    async create(@Body() data: LeaveRecord, @Req() req) {
         const user = req.user;
         // 1. Force companyId from token
         data.companyId = user.companyId;
@@ -485,7 +495,45 @@ export class LeaveRecordsController {
         }
 
         // 3. Persist validated data
-        return this.service.create(v.data as LeaveRecord);
+        const result = await this.service.create(v.data as LeaveRecord);
+
+        // 4. Send notification to manager
+        this.sendManagerNotification(v.data as LeaveRecord);
+
+        return result;
+    }
+
+    private async sendManagerNotification(leave: LeaveRecord) {
+        try {
+            const employee = await this.employeesService.findOne(leave.employeeId, leave.companyId);
+            if (!employee || !employee.reportingManagerEmail) {
+                return;
+            }
+
+            const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'https://app.hummane.com';
+            const leaveLink = `${frontendUrl}/leaves`; // Direct link to leaves page
+
+            await this.emailService.sendEmail(
+                [{ email: employee.reportingManagerEmail, name: employee.reportingManagerName }],
+                `New Leave Request: ${employee.name}`,
+                `
+                    <p>Hello ${employee.reportingManagerName},</p>
+                    <p><strong>${employee.name}</strong> has submitted a new leave request:</p>
+                    <ul>
+                        <li><strong>Start Date:</strong> ${leave.startDate}</li>
+                        <li><strong>End Date:</strong> ${leave.endDate}</li>
+                        <li><strong>Unit:</strong> ${leave.unit}</li>
+                        ${leave.amount ? `<li><strong>Amount:</strong> ${leave.amount}</li>` : ''}
+                        ${leave.note ? `<li><strong>Note:</strong> ${leave.note}</li>` : ''}
+                    </ul>
+                    <p>You can review and manage leave requests at the link below:</p>
+                    <p><a href="${leaveLink}">${leaveLink}</a></p>
+                    <p>Best regards,<br/>Hummane HR</p>
+                `,
+            );
+        } catch (error) {
+            console.error('Failed to send leave notification email:', error);
+        }
     }
 
     @Get()
@@ -512,6 +560,7 @@ export class LeaveRecordsController {
 }
 
 @Module({
+    imports: [EmployeesModule, EmailModule, ConfigModule],
     controllers: [LeaveRecordsController],
     providers: [LeaveRecordsService],
     exports: [LeaveRecordsService]

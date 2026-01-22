@@ -63,6 +63,7 @@ export const EmployeeSchema = z.object({
     employmentMode: EmploymentModeEnum.optional(),
     reportingManagerId: z.string().optional(),
     reportingManagerName: z.string().optional(),
+    reportingManagerEmail: z.string().optional(),
     gender: GenderEnum,
     salary: TwoDecimalNumberSchema.optional(),
     photoUrl: z.string().url().optional().or(z.string().length(0)),
