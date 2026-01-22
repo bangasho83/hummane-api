@@ -337,13 +337,23 @@ export class LeaveRecordsService {
         });
     }
 
-    async findAll(companyId: string, limit = 50, employeeId?: string) {
+    async findAll(companyId: string, limit = 50, employeeId?: string, startDate?: string, endDate?: string) {
         const queryParts = [`lr.company_id = $1`];
         const queryValues: any[] = [companyId];
 
         if (employeeId) {
             queryValues.push(employeeId);
             queryParts.push(`lr.employee_id = $${queryValues.length}`);
+        }
+
+        if (startDate) {
+            queryValues.push(startDate);
+            queryParts.push(`lr.start_date >= $${queryValues.length}`);
+        }
+
+        if (endDate) {
+            queryValues.push(endDate);
+            queryParts.push(`lr.start_date <= $${queryValues.length}`);
         }
 
         const result = await this.postgres.query<LeaveRecord>(
@@ -537,8 +547,23 @@ export class LeaveRecordsController {
     }
 
     @Get()
-    findAll(@Req() req, @Query('limit') limit?: string, @Query('employeeId') employeeId?: string) {
-        return this.service.findAll(req.user.companyId, parseLimit(limit), employeeId);
+    findAll(
+        @Req() req,
+        @Query('limit') limit?: string,
+        @Query('employeeId') employeeId?: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+    ) {
+        // Default to Jan 1st of current year if no startDate is provided
+        const effectiveStartDate = startDate || `${new Date().getFullYear()}-01-01`;
+
+        return this.service.findAll(
+            req.user.companyId,
+            parseLimit(limit),
+            employeeId,
+            effectiveStartDate,
+            endDate,
+        );
     }
 
     @Get(':id')
