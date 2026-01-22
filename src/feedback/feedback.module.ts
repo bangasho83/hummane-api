@@ -350,16 +350,26 @@ export class FeedbackEntriesService {
             });
         }
     }
-    async findAll(companyId: string, limit = 50) {
-        const result = await this.postgres.query<FeedbackEntry>(
-            `SELECT ${this.selectFields}
+    async findAll(companyId: string, limit = 50, authorId?: string, subjectId?: string) {
+        const params: any[] = [companyId, limit];
+        let query = `SELECT ${this.selectFields}
              FROM feedback_entries fe
              LEFT JOIN employees author ON author.id = fe.author_id AND author.company_id = fe.company_id
-             WHERE fe.company_id = $1
-             ORDER BY fe.created_at DESC
-             LIMIT $2`,
-            [companyId, limit],
-        );
+             WHERE fe.company_id = $1`;
+
+        if (authorId) {
+            params.push(authorId);
+            query += ` AND fe.author_id = $${params.length}`;
+        }
+
+        if (subjectId) {
+            params.push(subjectId);
+            query += ` AND fe.subject_id = $${params.length}`;
+        }
+
+        query += ` ORDER BY fe.created_at DESC LIMIT $2`;
+
+        const result = await this.postgres.query<FeedbackEntry>(query, params);
         const entries = result.rows;
         if (!entries.length) return entries;
         const cardIds = [...new Set(entries.map(entry => entry.cardId).filter(Boolean))] as string[];
@@ -500,7 +510,14 @@ export class FeedbackEntriesController {
         // 4. Persist validated data
         return this.service.create(v.data as FeedbackEntry);
     }
-    @Get() findAll(@Req() req, @Query('limit') limit?: string) { return this.service.findAll(req.user.companyId, parseLimit(limit)); }
+    @Get() findAll(
+        @Req() req,
+        @Query('limit') limit?: string,
+        @Query('authorId') authorId?: string,
+        @Query('subjectId') subjectId?: string
+    ) {
+        return this.service.findAll(req.user.companyId, parseLimit(limit), authorId, subjectId);
+    }
     @Get(':id') findOne(@Param('id') id: string, @Req() req) { return this.service.findOne(id, req.user.companyId); }
     @Put(':id') update(@Param('id') id: string, @Body() d: Partial<FeedbackEntry>, @Req() req) {
         const updateData = { ...d };
