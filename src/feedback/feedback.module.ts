@@ -496,6 +496,7 @@ export class FeedbackEntriesController {
         private configService: ConfigService
     ) { }
     @Post() async create(@Body() d: FeedbackEntry, @Req() req) {
+        console.log(`[FeedbackLog] POST /feedback-entries hit by user ${req.user?.id}`);
         const user = req.user;
         // 1. Force companyId from token
         d.companyId = user.companyId;
