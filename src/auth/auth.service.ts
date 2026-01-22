@@ -4,6 +4,7 @@ import * as admin from 'firebase-admin';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { CompaniesService } from '../companies/companies.service';
+import { EmployeesService } from '../employees/employees.service';
 import { JwtPayload } from './auth.dto';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,6 +14,7 @@ export class AuthService {
         private jwtService: JwtService,
         private usersService: UsersService,
         private companiesService: CompaniesService,
+        private employeesService: EmployeesService,
         private configService: ConfigService,
     ) { }
 
@@ -118,10 +120,18 @@ export class AuthService {
                 company = null;
             }
 
+            // 4. Look up employee record if user has a company
+            let employeeId: string | undefined;
+            if (user.companyId) {
+                const employee = await this.employeesService.findByUserId(user.id, user.companyId);
+                employeeId = employee?.id;
+            }
+
             const payload: JwtPayload = {
                 sub: user.id,
                 email: user.email,
-                companyId: user.companyId
+                companyId: user.companyId,
+                employeeId: employeeId
             };
 
             console.log(`[AuthDebug] JWT Payload established:`, JSON.stringify(payload));

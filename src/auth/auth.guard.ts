@@ -22,7 +22,8 @@ export class AuthGuard implements CanActivate {
             request.user = {
                 id: payload.sub,
                 email: payload.email,
-                companyId: payload.companyId
+                companyId: payload.companyId,
+                employeeId: payload.employeeId
             };
 
             console.log(`[AuthGuard] [DEBUG] Populated req.user:`, JSON.stringify(request.user));

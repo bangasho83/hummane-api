@@ -10,4 +10,5 @@ export interface JwtPayload {
     sub: string; // User ID (Hummane ID)
     email: string;
     companyId?: string;
+    employeeId?: string;
 }
