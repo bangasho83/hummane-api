@@ -516,7 +516,10 @@ export class FeedbackEntriesController {
         const created = await this.service.create(v.data as FeedbackEntry);
 
         // 5. Send Email if subject is an employee
-        if (created && created.subjectType === 'employee' && created.subjectId) {
+        const subjectType = (created.subjectType || '').toLowerCase();
+        console.log(`[FeedbackEmail] Processing entry ${created.id}, subjectType: ${subjectType}, subjectId: ${created.subjectId}`);
+
+        if (created && subjectType === 'employee' && created.subjectId) {
             try {
                 // Fetch the employee to get their email
                 // We use findOne to ensure they belong to the company
