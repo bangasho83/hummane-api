@@ -153,6 +153,21 @@ export class AuthService {
                     if (employee) {
                         await this.employeesService.update(employee.id, { userId: user.id }, invitation.companyId);
                         console.log(`[AuthService] Linked user ${user.id} to employee ${employee.id}`);
+                    } else {
+                        // Auto-create employee record if none exists
+                        console.log(`[AuthService] No existing employee record found. Auto-creating for ${user.email}`);
+                        employee = await this.employeesService.create({
+                            companyId: invitation.companyId,
+                            userId: user.id,
+                            email: user.email,
+                            name: user.name,
+                            roleId: undefined,
+                            startDate: new Date(),
+                            employmentType: 'Full-time',
+                            gender: 'Prefer not to say',
+                            employeeId: `EMP-${Date.now().toString().slice(-6)}`
+                        } as any);
+                        console.log(`[AuthService] Created new employee record ${employee.id}`);
                     }
 
                     // Mark invitation as accepted

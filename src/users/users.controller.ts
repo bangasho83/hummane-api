@@ -33,7 +33,14 @@ export class UsersController {
     async getMe(@Req() req) {
         const firebaseUser = req.user;
         if (firebaseUser.email) {
-            return this.usersService.findByEmail(firebaseUser.email);
+            const user = await this.usersService.findByEmail(firebaseUser.email);
+            if (user) {
+                return {
+                    ...user,
+                    employeeId: firebaseUser.employeeId
+                };
+            }
+            return user;
         }
         return null;
     }
