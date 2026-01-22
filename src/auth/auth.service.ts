@@ -140,7 +140,16 @@ export class AuthService {
                     company = await this.companiesService.findOne(invitation.companyId);
 
                     // Look for existing employee record to link
-                    const employee = await this.employeesService.findOne(invitation.employeeId || '', invitation.companyId);
+                    let employee: any = null;
+                    if (invitation.employeeId) {
+                        employee = await this.employeesService.findOne(invitation.employeeId, invitation.companyId);
+                    }
+
+                    // Fallback: Try to find by email if not found by ID or if ID wasn't provided
+                    if (!employee) {
+                        employee = await this.employeesService.findByEmail(user.email, invitation.companyId);
+                    }
+
                     if (employee) {
                         await this.employeesService.update(employee.id, { userId: user.id }, invitation.companyId);
                         console.log(`[AuthService] Linked user ${user.id} to employee ${employee.id}`);

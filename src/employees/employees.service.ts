@@ -132,6 +132,20 @@ export class EmployeesService {
         return result.rows[0] ?? null;
     }
 
+    async findByEmail(email: string, companyId: string): Promise<Employee | null> {
+        const result = await this.postgres.query<Employee>(
+            `SELECT ${this.selectFields}
+             FROM employees e
+             LEFT JOIN departments d ON d.id = e.department_id AND d.company_id = e.company_id
+             LEFT JOIN roles r ON r.id = e.role_id AND r.company_id = e.company_id
+             LEFT JOIN employees m ON m.id = e.reporting_manager_id AND m.company_id = e.company_id
+             WHERE e.email = $1 AND e.company_id = $2
+             LIMIT 1`,
+            [email, companyId],
+        );
+        return result.rows[0] ?? null;
+    }
+
     async update(id: string, updateData: Partial<Employee>, companyId: string): Promise<Employee | null> {
         const updates: string[] = [];
         const values: unknown[] = [];
