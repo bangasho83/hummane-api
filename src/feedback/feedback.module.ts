@@ -1,4 +1,7 @@
 import { BadRequestException, ConflictException, InternalServerErrorException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EmailModule } from '../email/email.module';
+import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
 import { UsersModule } from '../users/users.module';
 import { EmployeesModule } from '../employees/employees.module';
@@ -488,7 +491,9 @@ export class FeedbackEntriesController {
     constructor(
         private service: FeedbackEntriesService,
         private usersService: UsersService,
-        private employeesService: EmployeesService
+        private employeesService: EmployeesService,
+        private emailService: EmailService,
+        private configService: ConfigService
     ) { }
     @Post() async create(@Body() d: FeedbackEntry, @Req() req) {
         const user = req.user;
@@ -508,7 +513,42 @@ export class FeedbackEntriesController {
         }
 
         // 4. Persist validated data
-        return this.service.create(v.data as FeedbackEntry);
+        const created = await this.service.create(v.data as FeedbackEntry);
+
+        // 5. Send Email if subject is an employee
+        if (created && created.subjectType === 'employee' && created.subjectId) {
+            try {
+                // Fetch the employee to get their email
+                // We use findOne to ensure they belong to the company
+                const employee = await this.employeesService.findOne(created.subjectId, req.user.companyId);
+
+                if (employee && employee.email) {
+                    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://hummane.com';
+                    const feedbackLink = `${frontendUrl}/feedback/entries/${created.id}`; // Assuming this route exists
+
+                    await this.emailService.sendEmail(
+                        { email: employee.email, name: employee.name },
+                        'You have received new feedback',
+                        `
+                        <html>
+                            <body>
+                                <h3>New Feedback Received</h3>
+                                <p>You have received new feedback on Hummane.</p>
+                                <p>
+                                    <a href="${feedbackLink}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Feedback</a>
+                                </p>
+                                <p>Or copy this link: ${feedbackLink}</p>
+                            </body>
+                        </html>
+                        `
+                    );
+                }
+            } catch (e) {
+                console.error('Failed to send feedback notification email', e);
+            }
+        }
+
+        return created;
     }
     @Get() findAll(
         @Req() req,
@@ -528,7 +568,7 @@ export class FeedbackEntriesController {
 }
 
 @Module({
-    imports: [UsersModule, EmployeesModule],
+    imports: [UsersModule, EmployeesModule, EmailModule, ConfigModule],
     controllers: [FeedbackCardsController, FeedbackEntriesController],
     providers: [FeedbackCardsService, FeedbackEntriesService],
     exports: [FeedbackCardsService, FeedbackEntriesService]
