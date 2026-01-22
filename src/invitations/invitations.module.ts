@@ -205,7 +205,7 @@ export class InvitationsController {
 
         // Send Email
         try {
-            const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://hummane.com';
+            const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://app.hummane.com';
             const signupLink = `${frontendUrl}/signup?email=${encodeURIComponent(created.email)}&token=${inviteToken}&companyId=${created.companyId}`;
 
             await this.emailService.sendEmail(

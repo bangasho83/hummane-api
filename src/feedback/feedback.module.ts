@@ -527,7 +527,7 @@ export class FeedbackEntriesController {
                 const employee = await this.employeesService.findOne(created.subjectId, req.user.companyId);
 
                 if (employee && employee.email) {
-                    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://hummane.com';
+                    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://app.hummane.com';
                     const feedbackLink = `${frontendUrl}/feedback/entries/${created.id}`; // Assuming this route exists
 
                     await this.emailService.sendEmail(
