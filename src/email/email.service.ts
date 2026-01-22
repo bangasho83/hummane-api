@@ -24,6 +24,25 @@ export class EmailService {
         }
     }
 
+    private logCurl(payload: any) {
+        // Mask API key for logs (show first 8 chars)
+        const maskedKey = this.apiKey
+            ? `${this.apiKey.substring(0, 8)}...[REDACTED]`
+            : 'MISSING';
+
+        // Escape single quotes for shell safety
+        const data = JSON.stringify(payload).replace(/'/g, "'\\''");
+
+        const curl = `curl --request POST \\
+  --url ${this.apiUrl} \\
+  --header 'accept: application/json' \\
+  --header 'api-key: ${maskedKey}' \\
+  --header 'content-type: application/json' \\
+  --data '${data}'`;
+
+        this.logger.log(`[Email Audit] Executing Brevo Request:\n${curl}`);
+    }
+
     async sendEmail(
         to: EmailRecipient | EmailRecipient[],
         subject: string,
@@ -45,6 +64,8 @@ export class EmailService {
             subject: subject,
             htmlContent: htmlContent,
         };
+
+        this.logCurl(payload);
 
         try {
             const response = await fetch(this.apiUrl, {
