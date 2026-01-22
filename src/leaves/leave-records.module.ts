@@ -6,7 +6,7 @@ import { EmailService } from '../email/email.service';
 import { ConfigService, ConfigModule } from '@nestjs/config';
 import { EmployeesModule } from '../employees/employees.module';
 import { EmailModule } from '../email/email.module';
-import { LeaveDay, LeaveRecord, LeaveRecordSchema } from '../schemas/hr.schema';
+import { LeaveDay, LeaveRecord, LeaveRecordSchema, LeaveType } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { parseLimit } from '../utils/pagination';
 import { PostgresService } from '../postgres/postgres.service';
@@ -480,6 +480,40 @@ export class LeaveRecordsService {
             );
         });
     }
+
+    async getQuotaSummary(companyId: string, employeeId: string, year: number) {
+        const startDate = `${year}-01-01`;
+        const endDate = `${year}-12-31`;
+
+        // 1. Get all leave types for this company
+        const leaveTypesResult = await this.postgres.query<LeaveType>(
+            `SELECT id, name, code, unit, quota, color
+             FROM leave_types
+             WHERE company_id = $1`,
+            [companyId],
+        );
+
+        // 2. Get usage from leave_days for this employee and year
+        const usageResult = await this.postgres.query<{ leaveTypeId: string; used: number }>(
+            `SELECT leave_type_id AS "leaveTypeId", SUM(amount) AS "used"
+             FROM leave_days
+             WHERE company_id = $1 AND employee_id = $2 AND date >= $3 AND date <= $4
+             GROUP BY leave_type_id`,
+            [companyId, employeeId, startDate, endDate],
+        );
+
+        const usageMap = new Map(usageResult.rows.map(r => [r.leaveTypeId, Number(r.used)]));
+
+        // 3. Combine into summary
+        return leaveTypesResult.rows.map(type => {
+            const used = usageMap.get(type.id!) || 0;
+            return {
+                ...type,
+                used,
+                remaining: type.quota - used,
+            };
+        });
+    }
 }
 
 @Controller('leaves')
@@ -547,23 +581,35 @@ export class LeaveRecordsController {
     }
 
     @Get()
-    findAll(
+    async findAll(
         @Req() req,
         @Query('limit') limit?: string,
         @Query('employeeId') employeeId?: string,
         @Query('startDate') startDate?: string,
         @Query('endDate') endDate?: string,
     ) {
+        const companyId = req.user.companyId;
         // Default to Jan 1st of current year if no startDate is provided
-        const effectiveStartDate = startDate || `${new Date().getFullYear()}-01-01`;
+        const year = new Date().getFullYear();
+        const effectiveStartDate = startDate || `${year}-01-01`;
 
-        return this.service.findAll(
-            req.user.companyId,
+        const records = await this.service.findAll(
+            companyId,
             parseLimit(limit),
             employeeId,
             effectiveStartDate,
             endDate,
         );
+
+        let summary = null;
+        if (employeeId) {
+            summary = await this.service.getQuotaSummary(companyId, employeeId, year);
+        }
+
+        return {
+            records,
+            summary,
+        };
     }
 
     @Get(':id')
