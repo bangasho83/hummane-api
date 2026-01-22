@@ -17,6 +17,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { PublicModule } from './public/public.module';
 import { FirestoreModule } from './firestore/firestore.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
     imports: [
@@ -40,6 +41,7 @@ import { FirestoreModule } from './firestore/firestore.module';
         InvitationsModule,
         PublicModule,
         FirestoreModule,
+        EmailModule,
     ],
     controllers: [],
     providers: [],

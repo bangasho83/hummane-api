@@ -1,4 +1,7 @@
 import { BadRequestException, Module, Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Injectable, Query, Req } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EmailModule } from '../email/email.module';
+import { EmailService } from '../email/email.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { UserInvitation, UserInvitationSchema } from '../schemas/core.schema';
@@ -170,7 +173,11 @@ export class InvitationsService {
 @Controller('invitations')
 @UseGuards(AuthGuard, CompanyGuard)
 export class InvitationsController {
-    constructor(private service: InvitationsService) { }
+    constructor(
+        private service: InvitationsService,
+        private emailService: EmailService,
+        private configService: ConfigService
+    ) { }
 
     @Post()
     async create(@Body() data: UserInvitation, @Req() req) {
@@ -195,6 +202,34 @@ export class InvitationsController {
 
         const inviteToken = randomBytes(32).toString('hex');
         const created = await this.service.create(result.data as UserInvitation, inviteToken);
+
+        // Send Email
+        try {
+            const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://hummane.com';
+            const signupLink = `${frontendUrl}/signup?email=${encodeURIComponent(created.email)}&token=${inviteToken}&companyId=${created.companyId}`;
+
+            await this.emailService.sendEmail(
+                { email: created.email },
+                'You have been invited to join Hummane',
+                `
+                <html>
+                    <body>
+                        <h3>Hello!</h3>
+                        <p>You have been invited to join the team on Hummane.</p>
+                        <p>Click the link below to accept your invitation and create your account:</p>
+                        <p>
+                            <a href="${signupLink}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Accept Invitation</a>
+                        </p>
+                        <p>Or copy this link: ${signupLink}</p>
+                    </body>
+                </html>
+                `
+            );
+        } catch (e) {
+            console.error('Failed to send invitation email', e);
+            // Don't fail the request if email fails, but log it
+        }
+
         return { ...created, inviteToken };
     }
 
@@ -240,6 +275,7 @@ export class InvitationsController {
 }
 
 @Module({
+    imports: [EmailModule, ConfigModule],
     controllers: [InvitationsController],
     providers: [InvitationsService],
     exports: [InvitationsService]
