@@ -43,8 +43,8 @@ export class CompaniesService {
             if (companyData.ownerId) {
                 console.log(`[CompaniesInfo] Linking owner ${companyData.ownerId} to new company ${id}`);
                 await client.query(
-                    `UPDATE users SET company_id = $1, updated_at = now() WHERE id = $2`,
-                    [id, companyData.ownerId],
+                    `UPDATE users SET company_id = $1, role = $2, updated_at = now() WHERE id = $3`,
+                    [id, 'owner', companyData.ownerId],
                 );
             }
 
