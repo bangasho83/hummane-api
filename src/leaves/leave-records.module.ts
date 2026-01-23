@@ -485,15 +485,23 @@ export class LeaveRecordsService {
         const startDate = `${year}-01-01`;
         const endDate = `${year}-12-31`;
 
-        // 1. Get all leave types for this company
+        // 1. Get employee employment type
+        const employeeResult = await this.postgres.query<{ employmentType: string }>(
+            `SELECT employment_type AS "employmentType" FROM employees WHERE id = $1 AND company_id = $2`,
+            [employeeId, companyId],
+        );
+        const empType = employeeResult.rows[0]?.employmentType;
+
+        // 2. Get relevant leave types (matches employment type or applies to all)
         const leaveTypesResult = await this.postgres.query<LeaveType>(
             `SELECT id, name, code, unit, quota, color
              FROM leave_types
-             WHERE company_id = $1`,
-            [companyId],
+             WHERE company_id = $1 
+             AND (employment_type IS NULL OR employment_type = $2 OR $2 IS NULL)`,
+            [companyId, empType],
         );
 
-        // 2. Get usage from leave_days for this employee and year
+        // 3. Get usage from leave_days for this employee and year
         const usageResult = await this.postgres.query<{ leaveTypeId: string; used: number }>(
             `SELECT leave_type_id AS "leaveTypeId", SUM(amount) AS "used"
              FROM leave_days
