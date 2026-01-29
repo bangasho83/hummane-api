@@ -48,7 +48,7 @@ export class LeaveTypesService {
             `SELECT ${this.selectFields}
              FROM leave_types
              WHERE company_id = $1
-             ORDER BY created_at DESC
+             ORDER BY name ASC
              LIMIT $2`,
             [companyId, limit],
         );
