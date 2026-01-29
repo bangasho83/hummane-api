@@ -35,7 +35,7 @@ export class RolesService {
             `SELECT ${this.selectFields}
              FROM roles
              WHERE company_id = $1
-             ORDER BY created_at DESC
+             ORDER BY title ASC
              LIMIT $2`,
             [companyId, limit],
         );
