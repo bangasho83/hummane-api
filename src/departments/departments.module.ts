@@ -39,7 +39,7 @@ export class DepartmentsService {
             `SELECT ${this.selectFields}
              FROM departments
              WHERE company_id = $1
-             ORDER BY created_at DESC
+             ORDER BY name ASC
              LIMIT $2`,
             [companyId, limit],
         );

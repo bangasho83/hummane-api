@@ -26,7 +26,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS companies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id uuid NOT NULL,
+  owner_id uuid,
   name text NOT NULL,
   industry text,
   size text,
@@ -238,96 +238,96 @@ CREATE TABLE IF NOT EXISTS feedback_entries (
 -- Foreign keys (added after tables to avoid dependency ordering)
 ALTER TABLE companies
   ADD CONSTRAINT companies_owner_fk
-  FOREIGN KEY (owner_id) REFERENCES users (id)
+  FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE SET NULL
   DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE users
   ADD CONSTRAINT users_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id);
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE;
 
 ALTER TABLE user_invitations
   ADD CONSTRAINT user_invitations_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id),
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
   ADD CONSTRAINT user_invitations_invited_by_fk
-  FOREIGN KEY (invited_by) REFERENCES users (id),
+  FOREIGN KEY (invited_by) REFERENCES users (id) ON DELETE CASCADE,
   ADD CONSTRAINT user_invitations_employee_fk
-  FOREIGN KEY (employee_id) REFERENCES employees (id);
+  FOREIGN KEY (employee_id) REFERENCES employees (id) ON DELETE CASCADE;
 
 ALTER TABLE departments
   ADD CONSTRAINT departments_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id);
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE;
 
 ALTER TABLE roles
   ADD CONSTRAINT roles_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id);
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE;
 
 ALTER TABLE employees
   ADD CONSTRAINT employees_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id),
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
   ADD CONSTRAINT employees_user_fk
-  FOREIGN KEY (user_id) REFERENCES users (id),
+  FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   ADD CONSTRAINT employees_role_fk
-  FOREIGN KEY (role_id) REFERENCES roles (id),
+  FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE SET NULL,
   ADD CONSTRAINT employees_department_fk
-  FOREIGN KEY (department_id) REFERENCES departments (id),
+  FOREIGN KEY (department_id) REFERENCES departments (id) ON DELETE SET NULL,
   ADD CONSTRAINT employees_reporting_manager_fk
-  FOREIGN KEY (reporting_manager_id) REFERENCES employees (id);
+  FOREIGN KEY (reporting_manager_id) REFERENCES employees (id) ON DELETE SET NULL;
 
 ALTER TABLE employee_documents
   ADD CONSTRAINT employee_documents_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id),
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
   ADD CONSTRAINT employee_documents_employee_fk
-  FOREIGN KEY (employee_id) REFERENCES employees (id);
+  FOREIGN KEY (employee_id) REFERENCES employees (id) ON DELETE CASCADE;
 
 ALTER TABLE jobs
   ADD CONSTRAINT jobs_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id),
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
   ADD CONSTRAINT jobs_role_fk
-  FOREIGN KEY (role_id) REFERENCES roles (id),
+  FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE SET NULL,
   ADD CONSTRAINT jobs_department_fk
-  FOREIGN KEY (department_id) REFERENCES departments (id);
+  FOREIGN KEY (department_id) REFERENCES departments (id) ON DELETE SET NULL;
 
 ALTER TABLE applicants
   ADD CONSTRAINT applicants_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id),
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
   ADD CONSTRAINT applicants_job_fk
-  FOREIGN KEY (job_id) REFERENCES jobs (id);
+  FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE;
 
 ALTER TABLE leave_types
   ADD CONSTRAINT leave_types_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id);
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE;
 
 ALTER TABLE leave_records
   ADD CONSTRAINT leave_records_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id),
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
   ADD CONSTRAINT leave_records_employee_fk
-  FOREIGN KEY (employee_id) REFERENCES employees (id),
+  FOREIGN KEY (employee_id) REFERENCES employees (id) ON DELETE CASCADE,
   ADD CONSTRAINT leave_records_leave_type_fk
-  FOREIGN KEY (leave_type_id) REFERENCES leave_types (id);
+  FOREIGN KEY (leave_type_id) REFERENCES leave_types (id) ON DELETE CASCADE;
 
 ALTER TABLE leave_days
   ADD CONSTRAINT leave_days_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id),
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
   ADD CONSTRAINT leave_days_employee_fk
-  FOREIGN KEY (employee_id) REFERENCES employees (id),
+  FOREIGN KEY (employee_id) REFERENCES employees (id) ON DELETE CASCADE,
   ADD CONSTRAINT leave_days_leave_type_fk
-  FOREIGN KEY (leave_type_id) REFERENCES leave_types (id),
+  FOREIGN KEY (leave_type_id) REFERENCES leave_types (id) ON DELETE CASCADE,
   ADD CONSTRAINT leave_days_leave_record_fk
-  FOREIGN KEY (leave_record_id) REFERENCES leave_records (id);
+  FOREIGN KEY (leave_record_id) REFERENCES leave_records (id) ON DELETE CASCADE;
 
 ALTER TABLE holidays
   ADD CONSTRAINT holidays_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id);
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE;
 
 ALTER TABLE feedback_cards
   ADD CONSTRAINT feedback_cards_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id);
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE;
 
 ALTER TABLE feedback_entries
   ADD CONSTRAINT feedback_entries_company_fk
-  FOREIGN KEY (company_id) REFERENCES companies (id),
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
   ADD CONSTRAINT feedback_entries_card_fk
-  FOREIGN KEY (card_id) REFERENCES feedback_cards (id);
+  FOREIGN KEY (card_id) REFERENCES feedback_cards (id) ON DELETE CASCADE;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users (company_id);

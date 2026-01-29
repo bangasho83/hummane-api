@@ -95,7 +95,7 @@ export class EmployeesService {
              LEFT JOIN employees m
                ON m.id = e.reporting_manager_id AND m.company_id = e.company_id
              WHERE e.company_id = $1
-             ORDER BY e.created_at DESC
+             ORDER BY e.name ASC
              LIMIT $2`,
             [companyId, limit],
         );
