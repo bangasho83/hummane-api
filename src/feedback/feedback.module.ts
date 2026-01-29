@@ -164,6 +164,35 @@ export class FeedbackCardsService {
 export class FeedbackEntriesService {
     constructor(private postgres: PostgresService) { }
 
+    private normalizeAnswers(answers: any[]) {
+        if (!Array.isArray(answers)) return [];
+        return answers
+            .map((a) => {
+                if (!a || typeof a !== 'object') return null;
+
+                // 1. Enriched format: { kind, ..., answer: { questionId, answer, ... } }
+                if (a.answer && typeof a.answer === 'object' && a.answer.questionId) {
+                    const { answer, questionId, score, comment, ...rest } = a.answer;
+                    return {
+                        questionId,
+                        answer: answer ?? null,
+                        score: score ?? null,
+                        comment: comment ?? null,
+                        ...rest,
+                    };
+                }
+
+                // 2. Flat format: { questionId, answer, ... }
+                if (a.questionId) {
+                    const { question, ...clean } = a; // Strip metadata if present
+                    return clean;
+                }
+
+                return null;
+            })
+            .filter(Boolean);
+    }
+
     private formatErrorDetails(error: unknown) {
         const pgError = error as { name?: string; code?: string; message?: string; detail?: string; constraint?: string };
         return {
@@ -342,7 +371,7 @@ export class FeedbackEntriesService {
                     data.subjectId,
                     data.subjectName ?? null,
                     data.authorId ?? null,
-                    JSON.stringify(data.answers ?? []),
+                    JSON.stringify(this.normalizeAnswers(data.answers ?? [])),
                 ],
             );
             return this.findOne(result.rows[0].id, data.companyId);
@@ -424,7 +453,7 @@ export class FeedbackEntriesService {
 
         if (Object.prototype.hasOwnProperty.call(data, 'answers')) {
             updates.push(`answers = $${index++}::jsonb`);
-            values.push(JSON.stringify(data.answers ?? []));
+            values.push(JSON.stringify(this.normalizeAnswers(data.answers ?? [])));
         }
 
         updates.push('updated_at = now()');
