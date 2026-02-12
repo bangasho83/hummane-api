@@ -26,6 +26,7 @@ export class JobsService {
         'j.salary_from AS "salaryFrom"',
         'j.salary_to AS "salaryTo"',
         'j.experience',
+        'j.requirement',
         'j.status',
         '(SELECT COUNT(*)::int FROM applicants a WHERE a.job_id = j.id) AS "applicantCount"',
         'j.created_at AS "createdAt"',
@@ -48,8 +49,9 @@ export class JobsService {
                 salary_from,
                 salary_to,
                 experience,
+                requirement,
                 status
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
             RETURNING id`,
             [
                 id,
@@ -64,9 +66,11 @@ export class JobsService {
                 data.salaryFrom ?? null,
                 data.salaryTo ?? null,
                 data.experience ?? null,
+                data.requirement ?? null,
                 data.status,
             ],
         );
+
         return this.findOne(id, data.companyId);
     }
 
@@ -178,7 +182,12 @@ export class JobsService {
             updates.push(`experience = $${index++}`);
             values.push(data.experience ?? null);
         }
+        if (Object.prototype.hasOwnProperty.call(data, 'requirement')) {
+            updates.push(`requirement = $${index++}`);
+            values.push(data.requirement ?? null);
+        }
         if (data.status !== undefined) {
+
             updates.push(`status = $${index++}`);
             values.push(data.status);
         }
