@@ -54,7 +54,9 @@ export const CompanySchema = z.object({
     currency: z.string().optional(),
     timezone: z.string().optional(),
     workingHours: WorkingHoursSchema.optional(),
+    about: z.string().optional(),
     ownerId: z.string(),
+
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
 });

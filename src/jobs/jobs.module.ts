@@ -27,6 +27,7 @@ export class JobsService {
         'j.salary_to AS "salaryTo"',
         'j.experience',
         'j.requirement',
+        'c.about AS "companyAbout"',
         'j.status',
         '(SELECT COUNT(*)::int FROM applicants a WHERE a.job_id = j.id) AS "applicantCount"',
         'j.created_at AS "createdAt"',
@@ -116,6 +117,7 @@ export class JobsService {
              FROM jobs j
              LEFT JOIN roles r ON r.id = j.role_id AND r.company_id = j.company_id
              LEFT JOIN departments d ON d.id = j.department_id AND d.company_id = j.company_id
+             LEFT JOIN companies c ON c.id = j.company_id
              WHERE ${updates.join(' AND ')}
              ORDER BY j.created_at DESC
              LIMIT $2`,
@@ -130,6 +132,7 @@ export class JobsService {
              FROM jobs j
              LEFT JOIN roles r ON r.id = j.role_id AND r.company_id = j.company_id
              LEFT JOIN departments d ON d.id = j.department_id AND d.company_id = j.company_id
+             LEFT JOIN companies c ON c.id = j.company_id
              WHERE j.id = $1 AND j.company_id = $2
              LIMIT 1`,
             [id, companyId],

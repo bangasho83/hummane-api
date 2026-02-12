@@ -83,7 +83,7 @@ curl -X DELETE "$BASE_URL/invitations/YOUR_INVITATION_ID" \
 curl -X POST "$BASE_URL/companies" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Acme Inc","industry":"Software","size":"11-50","currency":"USD","timezone":"America/New_York","workingHours":{"monday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"tuesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"wednesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"thursday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"friday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"saturday":{"open":false,"start":"09:00 AM","end":"05:00 PM"},"sunday":{"open":false,"start":"09:00 AM","end":"05:00 PM"}}}'
+  -d '{"name":"Acme Inc","industry":"Software","size":"11-50","currency":"USD","timezone":"America/New_York","about":"Acme Inc is a software company based in NYC.","workingHours":{"monday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"tuesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"wednesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"thursday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"friday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"saturday":{"open":false,"start":"09:00 AM","end":"05:00 PM"},"sunday":{"open":false,"start":"09:00 AM","end":"05:00 PM"}}}'
 
 ### GET /companies
 curl -X GET "$BASE_URL/companies" \
@@ -97,7 +97,7 @@ curl -X GET "$BASE_URL/companies/YOUR_COMPANY_ID" \
 curl -X PUT "$BASE_URL/companies/YOUR_COMPANY_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"industry":"Fintech","currency":"USD","timezone":"America/Los_Angeles","workingHours":{"monday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"tuesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"wednesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"thursday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"friday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"saturday":{"open":false,"start":"09:00 AM","end":"05:00 PM"},"sunday":{"open":false,"start":"09:00 AM","end":"05:00 PM"}}}'
+  -d '{"industry":"Fintech","currency":"USD","timezone":"America/Los_Angeles","about":"Acme Inc is a leading fintech provider helping millions manage their finances.","workingHours":{"monday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"tuesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"wednesday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"thursday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"friday":{"open":true,"start":"09:00 AM","end":"05:00 PM"},"saturday":{"open":false,"start":"09:00 AM","end":"05:00 PM"},"sunday":{"open":false,"start":"09:00 AM","end":"05:00 PM"}}}'
 
 ### DELETE /companies/:id
 curl -X DELETE "$BASE_URL/companies/YOUR_COMPANY_ID" \
@@ -195,7 +195,8 @@ curl -X DELETE "$BASE_URL/roles/YOUR_ROLE_ID" \
 curl -X POST "$BASE_URL/jobs" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Backend Engineer","departmentId":"YOUR_DEPARTMENT_ID","status":"open","employmentType":"Full-time","employmentMode":"Remote","city":"London","country":"United Kingdom","salaryFrom":60000,"salaryTo":85000,"companyId":"YOUR_COMPANY_ID"}'
+  -d '{"title":"Backend Engineer","departmentId":"YOUR_DEPARTMENT_ID","status":"open","employmentType":"Full-time","employmentMode":"Remote","city":"London","country":"United Kingdom","salaryFrom":60000,"salaryTo":85000,"requirement":"Must have 5+ years of Node.js experience and knowledge of NestJS.","companyId":"YOUR_COMPANY_ID"}'
+
 
 ### GET /jobs
 curl -X GET "$BASE_URL/jobs" \

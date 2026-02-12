@@ -17,6 +17,7 @@ export class CompaniesService {
         'currency',
         'timezone',
         'working_hours AS "workingHours"',
+        'about',
         'created_at AS "createdAt"',
         'updated_at AS "updatedAt"',
     ].join(', ');
@@ -25,8 +26,8 @@ export class CompaniesService {
         const id = companyData.id || uuidv4();
         const result = await this.postgres.withTransaction(async (client) => {
             const insert = await client.query<Company>(
-                `INSERT INTO companies (id, owner_id, name, industry, size, currency, timezone, working_hours)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `INSERT INTO companies (id, owner_id, name, industry, size, currency, timezone, working_hours, about)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                  RETURNING ${this.selectFields}`,
                 [
                     id,
@@ -37,8 +38,10 @@ export class CompaniesService {
                     companyData.currency ?? null,
                     companyData.timezone ?? null,
                     companyData.workingHours ?? null,
+                    companyData.about ?? null,
                 ],
             );
+
 
             if (companyData.ownerId) {
                 console.log(`[CompaniesInfo] Linking owner ${companyData.ownerId} to new company ${id}`);
@@ -102,6 +105,11 @@ export class CompaniesService {
             updates.push(`working_hours = $${index++}`);
             values.push(updateData.workingHours ?? null);
         }
+        if (Object.prototype.hasOwnProperty.call(updateData, 'about')) {
+            updates.push(`about = $${index++}`);
+            values.push(updateData.about ?? null);
+        }
+
 
         updates.push('updated_at = now()');
         values.push(id);
