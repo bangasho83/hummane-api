@@ -33,8 +33,10 @@ CREATE TABLE IF NOT EXISTS companies (
   currency text,
   timezone text,
   working_hours jsonb,
+  about text,
   api_key text UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now(),
+
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -127,8 +129,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   salary_from numeric(12, 2),
   salary_to numeric(12, 2),
   experience text,
+  requirement text,
   status text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
+
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
