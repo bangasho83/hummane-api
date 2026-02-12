@@ -99,6 +99,7 @@ export const JobSchema = z.object({
     departmentName: z.string().optional(),
     roleId: z.string().optional(),
     roleName: z.string().optional(),
+    roleDescription: z.string().optional(),
     employmentType: EmploymentTypeEnum.optional(),
     employmentMode: EmploymentModeEnum.optional(),
     city: z.string().optional(),

@@ -16,6 +16,7 @@ export class JobsService {
         'j.title',
         'j.role_id AS "roleId"',
         'r.title AS "roleName"',
+        'r.description AS "roleDescription"',
         'j.department_id AS "departmentId"',
         'd.name AS "departmentName"',
         'j.employment_type AS "employmentType"',
