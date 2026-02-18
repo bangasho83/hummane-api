@@ -135,7 +135,7 @@ const WorkDaySchema = z.object({
 
 export const ApplicantAssignmentSchema = z.object({
     status: z.string().min(1),
-    employeeIds: z.array(z.string().uuid()),
+    employeeId: z.string().uuid(),
     assignedAt: TimestampSchema.optional(),
 });
 
