@@ -79,7 +79,7 @@ export class ApplicantsService {
         return this.findOne(id, data.companyId);
     }
 
-    async findAll(companyId: string, limit = 50, jobId?: string) {
+    async findAll(companyId: string, limit = 50, jobId?: string, employeeId?: string) {
         let query = `
             SELECT ${this.selectFields} 
             FROM applicants a
@@ -88,10 +88,16 @@ export class ApplicantsService {
             WHERE a.company_id = $1`;
 
         const params: any[] = [companyId, limit];
+        let index = 3;
 
         if (jobId) {
-            query += ` AND a.job_id = $3`;
+            query += ` AND a.job_id = $${index++}`;
             params.push(jobId);
+        }
+
+        if (employeeId) {
+            query += ` AND a.assignments @> $${index++}`;
+            params.push(JSON.stringify([{ employeeId }]));
         }
 
         query += ` ORDER BY a.created_at DESC LIMIT $2`;
@@ -224,8 +230,13 @@ export class ApplicantsController {
     }
 
     @Get()
-    findAll(@Req() req, @Query('limit') limit?: string, @Query('jobId') jobId?: string) {
-        return this.service.findAll(req.user.companyId, parseLimit(limit), jobId);
+    findAll(
+        @Req() req,
+        @Query('limit') limit?: string,
+        @Query('jobId') jobId?: string,
+        @Query('employeeId') employeeId?: string
+    ) {
+        return this.service.findAll(req.user.companyId, parseLimit(limit), jobId, employeeId);
     }
 
     @Get(':id')
