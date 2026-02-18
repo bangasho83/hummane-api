@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS applicants (
   linkedin_url text,
   status text NOT NULL,
   applied_date date NOT NULL,
+  assignments jsonb NOT NULL DEFAULT '[]'::jsonb,
   documents jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()

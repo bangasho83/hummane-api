@@ -133,6 +133,12 @@ const WorkDaySchema = z.object({
     end: z.string().optional(),
 });
 
+export const ApplicantAssignmentSchema = z.object({
+    status: z.string().min(1),
+    employeeIds: z.array(z.string().uuid()),
+    assignedAt: TimestampSchema.optional(),
+});
+
 export const ApplicantSchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
@@ -149,6 +155,7 @@ export const ApplicantSchema = z.object({
     linkedinUrl: z.string().optional(),
     status: ApplicantStatusEnum,
     appliedDate: IsoDateSchema,
+    assignments: z.array(ApplicantAssignmentSchema).optional(),
     documents: DocumentFilesSchema.optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),

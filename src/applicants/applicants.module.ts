@@ -28,6 +28,7 @@ export class ApplicantsService {
         'a.linkedin_url AS "linkedinUrl"',
         'a.status',
         'a.applied_date AS "appliedDate"',
+        'a.assignments',
         'a.documents',
         'a.created_at AS "createdAt"',
         'a.updated_at AS "updatedAt"',
@@ -52,8 +53,9 @@ export class ApplicantsService {
                 linkedin_url,
                 status,
                 applied_date,
+                assignments,
                 documents
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
             [
                 id,
                 data.companyId,
@@ -70,6 +72,7 @@ export class ApplicantsService {
                 data.linkedinUrl ?? null,
                 data.status,
                 data.appliedDate,
+                JSON.stringify(data.assignments ?? []),
                 data.documents ?? null,
             ],
         );
@@ -166,6 +169,10 @@ export class ApplicantsService {
         if (Object.prototype.hasOwnProperty.call(data, 'appliedDate')) {
             updates.push(`applied_date = $${index++}`);
             values.push(data.appliedDate ?? null);
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'assignments')) {
+            updates.push(`assignments = $${index++}`);
+            values.push(JSON.stringify(data.assignments ?? []));
         }
         if (Object.prototype.hasOwnProperty.call(data, 'documents')) {
             updates.push(`documents = $${index++}`);
