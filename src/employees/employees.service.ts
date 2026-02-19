@@ -249,7 +249,7 @@ export class EmployeesService {
 
             if (careerChanged) {
                 statusHistory.push({
-                    date: updateData.startDate ?? new Date().toISOString().split('T')[0],
+                    date: (updateData as any).date ?? updateData.startDate ?? new Date().toISOString().split('T')[0],
                     employmentType: updateData.employmentType ?? current.employmentType,
                     roleId: updateData.roleId ?? current.roleId,
                     roleName: updateData.roleName ?? current.roleName,
