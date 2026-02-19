@@ -48,7 +48,6 @@ export class EmployeesService {
             statusHistory.push({
                 date: data.startDate,
                 employmentType: data.employmentType,
-                employmentMode: data.employmentMode,
                 roleId: data.roleId,
                 roleName: data.roleName,
                 salary: data.salary,
@@ -246,14 +245,12 @@ export class EmployeesService {
             const careerChanged =
                 (updateData.roleId !== undefined && updateData.roleId !== current.roleId) ||
                 (updateData.employmentType !== undefined && updateData.employmentType !== current.employmentType) ||
-                (updateData.employmentMode !== undefined && updateData.employmentMode !== current.employmentMode) ||
                 (updateData.salary !== undefined && Number(updateData.salary) !== Number(current.salary));
 
             if (careerChanged) {
                 statusHistory.push({
                     date: updateData.startDate ?? new Date().toISOString().split('T')[0],
                     employmentType: updateData.employmentType ?? current.employmentType,
-                    employmentMode: updateData.employmentMode ?? current.employmentMode,
                     roleId: updateData.roleId ?? current.roleId,
                     roleName: updateData.roleName ?? current.roleName,
                     salary: updateData.salary ?? current.salary,
