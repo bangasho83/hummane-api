@@ -50,6 +50,7 @@ export class EmployeesService {
                 employmentType: data.employmentType,
                 roleId: data.roleId,
                 roleName: data.roleName,
+                salary: data.salary,
             });
         }
 
