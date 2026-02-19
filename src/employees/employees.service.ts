@@ -41,6 +41,18 @@ export class EmployeesService {
 
     async create(data: Employee): Promise<Employee> {
         const id = data.id || uuidv4();
+
+        // Automatically populate initial status history if empty
+        const statusHistory = data.statusHistory ?? [];
+        if (statusHistory.length === 0) {
+            statusHistory.push({
+                date: data.startDate,
+                employmentType: data.employmentType,
+                roleId: data.roleId,
+                roleName: data.roleName,
+            });
+        }
+
         await this.postgres.query<{ id: string }>(
             `INSERT INTO employees (
                 id,
@@ -81,7 +93,7 @@ export class EmployeesService {
                 data.photoUrl ?? null,
                 data.dob ?? null,
                 data.personalDetails ? JSON.stringify(data.personalDetails) : null,
-                JSON.stringify(data.statusHistory ?? []),
+                JSON.stringify(statusHistory),
             ],
         );
         return this.findOne(id, data.companyId) as Promise<Employee>;
