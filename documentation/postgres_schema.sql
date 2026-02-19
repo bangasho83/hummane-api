@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS employees (
   photo_url text,
   dob date,
   personal_details jsonb,
+  status_history jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (company_id, employee_id)
