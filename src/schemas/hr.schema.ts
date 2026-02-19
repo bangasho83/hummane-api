@@ -49,6 +49,7 @@ export const EmployeePersonalDetailsSchema = z.object({
 
 export const EmployeeStatusHistoryEntrySchema = z.object({
     employmentType: z.string().min(1),
+    employmentMode: z.string().optional(),
     roleId: z.string().uuid().optional().or(z.string().length(0)),
     roleName: z.string().optional(),
     salary: TwoDecimalNumberSchema.optional(),
