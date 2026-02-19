@@ -48,15 +48,10 @@ export const EmployeePersonalDetailsSchema = z.object({
 });
 
 export const EmployeeStatusHistoryEntrySchema = z.object({
-    type: z.string().min(1), // e.g., "hired", "confirmed", "promotion", "resigned", "offboarded"
-    date: IsoDateSchema,
-    roleId: z.string().optional(),
+    employmentType: z.string().min(1),
+    roleId: z.string().uuid().optional().or(z.string().length(0)),
     roleName: z.string().optional(),
-    departmentId: z.string().optional(),
-    departmentName: z.string().optional(),
-    employmentType: z.string().optional(),
-    salary: TwoDecimalNumberSchema.optional(),
-    note: z.string().optional(),
+    date: IsoDateSchema,
 });
 
 export const EmployeeSchema = z.object({
