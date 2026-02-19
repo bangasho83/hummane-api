@@ -244,12 +244,21 @@ export class EmployeesService {
             // Check if any "career milestone" fields have changed
             const careerChanged =
                 (updateData.roleId !== undefined && updateData.roleId !== current.roleId) ||
+                (updateData.roleName !== undefined && updateData.roleName !== current.roleName) ||
                 (updateData.employmentType !== undefined && updateData.employmentType !== current.employmentType) ||
                 (updateData.salary !== undefined && Number(updateData.salary) !== Number(current.salary));
 
-            if (careerChanged) {
+            // Also check if we should "seed" the history if it's currently empty
+            const shouldSeed = statusHistory.length === 0 && (
+                updateData.roleId !== undefined ||
+                updateData.roleName !== undefined ||
+                updateData.employmentType !== undefined ||
+                updateData.salary !== undefined
+            );
+
+            if (careerChanged || shouldSeed) {
                 statusHistory.push({
-                    date: (updateData as any).date ?? updateData.startDate ?? new Date().toISOString().split('T')[0],
+                    date: (updateData as any).date ?? updateData.startDate ?? current.startDate ?? new Date().toISOString().split('T')[0],
                     employmentType: updateData.employmentType ?? current.employmentType,
                     roleId: updateData.roleId ?? current.roleId,
                     roleName: updateData.roleName ?? current.roleName,
