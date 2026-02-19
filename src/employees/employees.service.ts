@@ -164,10 +164,15 @@ export class EmployeesService {
     }
 
     async update(id: string, updateData: Partial<Employee>, companyId: string): Promise<Employee | null> {
+        // 1. Fetch current employee to detect changes and get current history
+        const current = await this.findOne(id, companyId);
+        if (!current) return null;
+
         const updates: string[] = [];
         const values: unknown[] = [];
         let index = 1;
 
+        // 2. Prepare updates
         if (updateData.employeeId !== undefined) {
             updates.push(`employee_id = $${index++}`);
             values.push(updateData.employeeId);
@@ -228,10 +233,33 @@ export class EmployeesService {
             updates.push(`personal_details = $${index++}`);
             values.push(updateData.personalDetails ? JSON.stringify(updateData.personalDetails) : null);
         }
+
+        // 3. Automated History Appending
+        let statusHistory = [...(current.statusHistory ?? [])];
+
+        // If the user manually sends statusHistory, we use that (allows manual fixes)
         if (Object.prototype.hasOwnProperty.call(updateData, 'statusHistory')) {
-            updates.push(`status_history = $${index++}`);
-            values.push(JSON.stringify(updateData.statusHistory ?? []));
+            statusHistory = updateData.statusHistory ?? [];
+        } else {
+            // Check if any "career milestone" fields have changed
+            const careerChanged =
+                (updateData.roleId !== undefined && updateData.roleId !== current.roleId) ||
+                (updateData.employmentType !== undefined && updateData.employmentType !== current.employmentType) ||
+                (updateData.salary !== undefined && Number(updateData.salary) !== Number(current.salary));
+
+            if (careerChanged) {
+                statusHistory.push({
+                    date: updateData.startDate ?? new Date().toISOString().split('T')[0],
+                    employmentType: updateData.employmentType ?? current.employmentType,
+                    roleId: updateData.roleId ?? current.roleId,
+                    roleName: updateData.roleName ?? current.roleName,
+                    salary: updateData.salary ?? current.salary,
+                });
+            }
         }
+
+        updates.push(`status_history = $${index++}`);
+        values.push(JSON.stringify(statusHistory));
 
         updates.push('updated_at = now()');
         values.push(id, companyId);
