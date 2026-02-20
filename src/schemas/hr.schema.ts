@@ -196,7 +196,10 @@ export const LeaveRecordSchema = z.object({
     leaveTypeColor: z.string().optional(),
     unit: LeaveUnitEnum,
     amount: TwoDecimalNumberSchema.optional(),
+    startTime: z.string().optional(),
+    endTime: z.string().optional(),
     note: z.string().optional(),
+
     documents: DocumentFilesSchema.optional(),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),

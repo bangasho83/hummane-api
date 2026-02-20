@@ -181,7 +181,10 @@ CREATE TABLE IF NOT EXISTS leave_records (
   end_date date NOT NULL,
   unit text NOT NULL,
   amount numeric(12, 2),
+  start_time text,
+  end_time text,
   note text,
+
   documents jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),

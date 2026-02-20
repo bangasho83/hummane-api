@@ -79,6 +79,8 @@ export class LeaveRecordsService {
         'lr.end_date AS "endDate"',
         'lr.unit',
         'lr.amount',
+        'lr.start_time AS "startTime"',
+        'lr.end_time AS "endTime"',
         'lr.note',
         'lr.documents',
         'lr.created_at AS "createdAt"',
@@ -301,9 +303,11 @@ export class LeaveRecordsService {
                         end_date,
                         unit,
                         amount,
+                        start_time,
+                        end_time,
                         note,
                         documents
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
                     [
                         id,
                         recordInput.companyId,
@@ -313,6 +317,8 @@ export class LeaveRecordsService {
                         recordInput.endDate,
                         recordInput.unit,
                         computedAmount,
+                        recordInput.startTime ?? null,
+                        recordInput.endTime ?? null,
                         recordInput.note ?? null,
                         recordInput.documents ?? null,
                     ],
@@ -415,6 +421,14 @@ export class LeaveRecordsService {
             if (Object.prototype.hasOwnProperty.call(data, 'amount')) {
                 updates.push(`amount = $${index++}`);
                 values.push(data.amount ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'startTime')) {
+                updates.push(`start_time = $${index++}`);
+                values.push(data.startTime ?? null);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'endTime')) {
+                updates.push(`end_time = $${index++}`);
+                values.push(data.endTime ?? null);
             }
             if (Object.prototype.hasOwnProperty.call(data, 'note')) {
                 updates.push(`note = $${index++}`);
@@ -573,6 +587,8 @@ export class LeaveRecordsController {
 
             const leaveLink = `https://app.hummane.com/member/attendance`;
 
+            const isHourly = leave.unit === 'Hour';
+
             await this.emailService.sendEmail(
                 [{ email: employee.reportingManagerEmail, name: employee.reportingManagerName }],
                 `New Leave Request: ${employee.name}`,
@@ -580,8 +596,14 @@ export class LeaveRecordsController {
                     <p>Hello ${employee.reportingManagerName},</p>
                     <p><strong>${employee.name}</strong> has submitted a new leave request:</p>
                     <ul>
-                        <li><strong>Start Date:</strong> ${this.formatDate(leave.startDate)}</li>
-                        <li><strong>End Date:</strong> ${this.formatDate(leave.endDate)}</li>
+                        ${isHourly ? `
+                            <li><strong>Date:</strong> ${this.formatDate(leave.startDate)}</li>
+                            <li><strong>Start Time:</strong> ${leave.startTime}</li>
+                            <li><strong>End Time:</strong> ${leave.endTime}</li>
+                        ` : `
+                            <li><strong>Start Date:</strong> ${this.formatDate(leave.startDate)}</li>
+                            <li><strong>End Date:</strong> ${this.formatDate(leave.endDate)}</li>
+                        `}
                         ${leave.note ? `<li><strong>Note:</strong> ${leave.note}</li>` : ''}
                     </ul>
 
