@@ -582,10 +582,9 @@ export class LeaveRecordsController {
                     <ul>
                         <li><strong>Start Date:</strong> ${this.formatDate(leave.startDate)}</li>
                         <li><strong>End Date:</strong> ${this.formatDate(leave.endDate)}</li>
-                        <li><strong>Unit:</strong> ${leave.unit}</li>
-                        ${leave.amount ? `<li><strong>Amount:</strong> ${leave.amount}</li>` : ''}
                         ${leave.note ? `<li><strong>Note:</strong> ${leave.note}</li>` : ''}
                     </ul>
+
                     <p>You can review and manage leave requests at the link below:</p>
                     <p><a href="${leaveLink}">${leaveLink}</a></p>
                     <p>Best regards,<br/>Hummane HR</p>
