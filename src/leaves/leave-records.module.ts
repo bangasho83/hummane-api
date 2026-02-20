@@ -361,7 +361,7 @@ export class LeaveRecordsService {
              FROM leave_records lr
              LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id
              WHERE ${queryParts.join(' AND ')}
-             ORDER BY lr.start_date ASC
+             ORDER BY lr.start_date DESC
              LIMIT $${queryValues.length + 1}`,
             [...queryValues, limit],
         );
