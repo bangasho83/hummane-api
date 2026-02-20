@@ -555,6 +555,15 @@ export class LeaveRecordsController {
         return result;
     }
 
+    private formatDate(dateStr: string): string {
+        const date = new Date(`${dateStr}T12:00:00Z`);
+        return new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }).format(date);
+    }
+
     private async sendManagerNotification(leave: LeaveRecord) {
         try {
             const employee = await this.employeesService.findOne(leave.employeeId, leave.companyId);
@@ -562,8 +571,7 @@ export class LeaveRecordsController {
                 return;
             }
 
-            const frontendUrl = this.config.get<string>('FRONTEND_URL') || 'https://app.hummane.com';
-            const leaveLink = `${frontendUrl}/leaves`; // Direct link to leaves page
+            const leaveLink = `https://app.hummane.com/member/attendance`;
 
             await this.emailService.sendEmail(
                 [{ email: employee.reportingManagerEmail, name: employee.reportingManagerName }],
@@ -572,8 +580,8 @@ export class LeaveRecordsController {
                     <p>Hello ${employee.reportingManagerName},</p>
                     <p><strong>${employee.name}</strong> has submitted a new leave request:</p>
                     <ul>
-                        <li><strong>Start Date:</strong> ${leave.startDate}</li>
-                        <li><strong>End Date:</strong> ${leave.endDate}</li>
+                        <li><strong>Start Date:</strong> ${this.formatDate(leave.startDate)}</li>
+                        <li><strong>End Date:</strong> ${this.formatDate(leave.endDate)}</li>
                         <li><strong>Unit:</strong> ${leave.unit}</li>
                         ${leave.amount ? `<li><strong>Amount:</strong> ${leave.amount}</li>` : ''}
                         ${leave.note ? `<li><strong>Note:</strong> ${leave.note}</li>` : ''}
