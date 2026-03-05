@@ -79,31 +79,50 @@ export class ApplicantsService {
         return this.findOne(id, data.companyId);
     }
 
-    async findAll(companyId: string, limit = 50, jobId?: string, employeeId?: string) {
-        let query = `
-            SELECT ${this.selectFields} 
-            FROM applicants a
-            LEFT JOIN jobs j ON j.id = a.job_id
-            LEFT JOIN departments d ON d.id = j.department_id
-            WHERE a.company_id = $1`;
-
-        const params: any[] = [companyId, limit];
-        let index = 3;
+    async findAll(companyId: string, page = 1, limit = 50, jobId?: string, employeeId?: string) {
+        let whereClause = `WHERE a.company_id = $1`;
+        const params: any[] = [companyId];
+        let index = 2;
 
         if (jobId) {
-            query += ` AND a.job_id = $${index++}`;
+            whereClause += ` AND a.job_id = $${index++}`;
             params.push(jobId);
         }
 
         if (employeeId) {
-            query += ` AND a.assignments @> $${index++}`;
+            whereClause += ` AND a.assignments @> $${index++}`;
             params.push(JSON.stringify([{ employeeId }]));
         }
 
-        query += ` ORDER BY a.created_at DESC LIMIT $2`;
+        // Get total count
+        const countQuery = `
+            SELECT COUNT(*)::int as total
+            FROM applicants a
+            ${whereClause}`;
+        const countResult = await this.postgres.query<{ total: number }>(countQuery, params);
+        const total = countResult.rows[0]?.total ?? 0;
 
-        const result = await this.postgres.query<Applicant>(query, params);
-        return result.rows;
+        // Get paginated data
+        const offset = (page - 1) * limit;
+        const dataQuery = `
+            SELECT ${this.selectFields} 
+            FROM applicants a
+            LEFT JOIN jobs j ON j.id = a.job_id
+            LEFT JOIN departments d ON d.id = j.department_id
+            ${whereClause}
+            ORDER BY a.created_at DESC
+            LIMIT $${index++} OFFSET $${index}`;
+
+        params.push(limit, offset);
+
+        const result = await this.postgres.query<Applicant>(dataQuery, params);
+
+        return {
+            data: result.rows,
+            total,
+            page,
+            limit
+        };
     }
 
     async findOne(id: string, companyId: string) {
@@ -232,11 +251,18 @@ export class ApplicantsController {
     @Get()
     findAll(
         @Req() req,
+        @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('jobId') jobId?: string,
         @Query('employeeId') employeeId?: string
     ) {
-        return this.service.findAll(req.user.companyId, parseLimit(limit), jobId, employeeId);
+        return this.service.findAll(
+            req.user.companyId,
+            parsePage(page),
+            parseLimit(limit),
+            jobId,
+            employeeId
+        );
     }
 
     @Get(':id')
