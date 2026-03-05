@@ -3,7 +3,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { CompanyGuard } from '../auth/company.guard';
 import { Applicant, ApplicantSchema } from '../schemas/hr.schema';
 import { v4 as uuidv4 } from 'uuid';
-import { parseLimit } from '../utils/pagination';
+import { parseLimit, parsePage } from '../utils/pagination';
 import { PostgresService } from '../postgres/postgres.service';
 
 @Injectable()
