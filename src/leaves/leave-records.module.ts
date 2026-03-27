@@ -569,13 +569,18 @@ export class LeaveRecordsController {
         return result;
     }
 
-    private formatDate(dateStr: string): string {
-        const date = new Date(`${dateStr}T12:00:00Z`);
-        return new Intl.DateTimeFormat('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        }).format(date);
+    private formatDate(dateInput: string | Date): string {
+        try {
+            const dateStr = dateInput instanceof Date ? dateInput.toISOString().slice(0, 10) : String(dateInput);
+            const date = new Date(`${dateStr}T12:00:00Z`);
+            return new Intl.DateTimeFormat('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            }).format(date);
+        } catch (e) {
+            return String(dateInput);
+        }
     }
 
     private async sendManagerNotification(leave: LeaveRecord) {
