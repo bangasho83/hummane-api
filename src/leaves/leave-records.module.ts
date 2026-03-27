@@ -599,9 +599,8 @@ export class LeaveRecordsController {
                 `New Leave Request: ${employee.name}`,
                 `
                     <p>Hello ${employee.reportingManagerName},</p>
-                    <p><strong>${employee.name}</strong> has submitted a new leave request:</p>
+                    <p><strong>${employee.name}</strong> has submitted a new <strong>${leave.leaveTypeName || 'Leave'}</strong> request:</p>
                     <ul>
-                        <li><strong>Leave Type:</strong> ${leave.leaveTypeName || 'Leave'}</li>
                         ${isHourly ? `
                             <li><strong>Date:</strong> ${this.formatDate(leave.startDate)}</li>
                             <li><strong>Start Time:</strong> ${leave.startTime}</li>
