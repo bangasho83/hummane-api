@@ -564,7 +564,7 @@ export class LeaveRecordsController {
         const result = await this.service.create(v.data as LeaveRecord);
 
         // 4. Send notification to manager
-        this.sendManagerNotification(v.data as LeaveRecord);
+        this.sendManagerNotification(result);
 
         return result;
     }
@@ -596,6 +596,7 @@ export class LeaveRecordsController {
                     <p>Hello ${employee.reportingManagerName},</p>
                     <p><strong>${employee.name}</strong> has submitted a new leave request:</p>
                     <ul>
+                        <li><strong>Leave Type:</strong> ${leave.leaveTypeName || 'Leave'}</li>
                         ${isHourly ? `
                             <li><strong>Date:</strong> ${this.formatDate(leave.startDate)}</li>
                             <li><strong>Start Time:</strong> ${leave.startTime}</li>
