@@ -596,7 +596,7 @@ export class LeaveRecordsController {
 
             await this.emailService.sendEmail(
                 [{ email: employee.reportingManagerEmail, name: employee.reportingManagerName }],
-                `New Leave Request: ${employee.name}`,
+                `New ${leave.leaveTypeName || 'Leave'} Request by ${employee.name}`,
                 `
                     <p>Hello ${employee.reportingManagerName},</p>
                     <p><strong>${employee.name}</strong> has submitted a new <strong>${leave.leaveTypeName || 'Leave'}</strong> request:</p>
