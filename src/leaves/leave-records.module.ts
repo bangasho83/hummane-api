@@ -641,7 +641,7 @@ export class LeaveRecordsController {
 
         const records = await this.service.findAll(
             companyId,
-            parseLimit(limit, 100, 200),
+            parseLimit(limit, 200, 500),
             employeeId,
             effectiveStartDate,
             endDate,
