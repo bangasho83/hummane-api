@@ -187,6 +187,7 @@ export const LeaveRecordSchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
     employeeId: z.string().min(1),
+    employeeName: z.string().optional(),
     startDate: IsoDateSchema,
     endDate: IsoDateSchema,
     leaveTypeId: z.string().optional(),

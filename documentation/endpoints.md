@@ -292,6 +292,7 @@ curl -X POST "$BASE_URL/leaves" \
   -d '{"employeeId":"EMP-001","leaveTypeId":"YOUR_LEAVE_TYPE_ID","startDate":"2024-01-16","endDate":"2024-01-18","unit":"Day","amount":1,"note":"Family event","documents":{"files":["https://example.com/leave-approval.docx"]},"companyId":"YOUR_COMPANY_ID"}'
 
 ### GET /leaves
+Retrieve leave records for the authenticated user's company (default limit is 100, max limit is 200).
 curl -X GET "$BASE_URL/leaves" \
   -H "Authorization: Bearer $TOKEN"
 
@@ -301,6 +302,7 @@ curl -X GET "$BASE_URL/leaves" \
   "id": "...",
   "leaveTypeName": "Annual Leave",
   "leaveTypeColor": "#e51451",
+  "employeeName": "Jane Doe",
   "startDate": "2024-01-16",
   "endDate": "2024-01-18",
   "amount": 3,

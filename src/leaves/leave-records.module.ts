@@ -70,6 +70,7 @@ export class LeaveRecordsService {
         'lr.id',
         'lr.company_id AS "companyId"',
         'lr.employee_id AS "employeeId"',
+        'e.name AS "employeeName"',
         'lr.leave_type_id AS "leaveTypeId"',
         'lt.name AS "leaveTypeName"',
         'lt.code AS "leaveTypeCode"',
@@ -329,6 +330,7 @@ export class LeaveRecordsService {
                     `SELECT ${this.selectFields}
                      FROM leave_records lr
                      LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id
+                     LEFT JOIN employees e ON e.id = lr.employee_id
                      WHERE lr.id = $1 LIMIT 1`,
                     [id],
                 );
@@ -366,6 +368,7 @@ export class LeaveRecordsService {
             `SELECT ${this.selectFields}
              FROM leave_records lr
              LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id
+             LEFT JOIN employees e ON e.id = lr.employee_id
              WHERE ${queryParts.join(' AND ')}
              ORDER BY lr.start_date DESC
              LIMIT $${queryValues.length + 1}`,
@@ -379,6 +382,7 @@ export class LeaveRecordsService {
             `SELECT ${this.selectFields}
              FROM leave_records lr
              LEFT JOIN leave_types lt ON lt.id = lr.leave_type_id
+             LEFT JOIN employees e ON e.id = lr.employee_id
              WHERE lr.id = $1 AND lr.company_id = $2
              LIMIT 1`,
             [id, companyId],
@@ -637,7 +641,7 @@ export class LeaveRecordsController {
 
         const records = await this.service.findAll(
             companyId,
-            parseLimit(limit),
+            parseLimit(limit, 100, 200),
             employeeId,
             effectiveStartDate,
             endDate,
