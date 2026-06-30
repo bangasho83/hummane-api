@@ -577,13 +577,36 @@ export class LeaveRecordsController {
         try {
             const dateStr = dateInput instanceof Date ? dateInput.toISOString().slice(0, 10) : String(dateInput);
             const date = new Date(`${dateStr}T12:00:00Z`);
-            return new Intl.DateTimeFormat('en-US', {
-                month: 'short',
+            return new Intl.DateTimeFormat('en-GB', {
                 day: 'numeric',
+                month: 'short',
                 year: 'numeric'
             }).format(date);
         } catch (e) {
             return String(dateInput);
+        }
+    }
+
+    private formatDateRange(start: string | Date, end: string | Date): string {
+        try {
+            const startStr = start instanceof Date ? start.toISOString().slice(0, 10) : String(start);
+            const endStr = end instanceof Date ? end.toISOString().slice(0, 10) : String(end);
+            const startDate = new Date(`${startStr}T12:00:00Z`);
+            const endDate = new Date(`${endStr}T12:00:00Z`);
+            const startYear = startDate.getUTCFullYear();
+            const endYear = endDate.getUTCFullYear();
+            const fmt = (d: Date, includeYear: boolean) =>
+                new Intl.DateTimeFormat('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    ...(includeYear ? { year: 'numeric' } : {}),
+                }).format(d);
+            if (startStr === endStr) {
+                return fmt(startDate, true);
+            }
+            return `${fmt(startDate, startYear !== endYear)} – ${fmt(endDate, true)}`;
+        } catch (e) {
+            return `${start} – ${end}`;
         }
     }
 
@@ -595,24 +618,33 @@ export class LeaveRecordsController {
             }
 
             const leaveLink = `https://app.hummane.com/member/attendance`;
-
             const isHourly = leave.unit === 'Hour';
+
+            // Leave Type line e.g. "Annual Leave (AL)"
+            const leaveTypeLabel = leave.leaveTypeName
+                ? (leave.leaveTypeCode ? `${leave.leaveTypeName} (${leave.leaveTypeCode})` : leave.leaveTypeName)
+                : 'Leave';
+
+            // Date line
+            const dateLine = isHourly
+                ? `${this.formatDate(leave.startDate)}, ${leave.startTime} – ${leave.endTime}`
+                : this.formatDateRange(leave.startDate, leave.endDate);
+
+            // Duration line e.g. "25 days · Full Day" or "3 hours"
+            const durationLine = isHourly
+                ? `${leave.amount} hour${(leave.amount ?? 0) !== 1 ? 's' : ''}`
+                : `${leave.amount} day${(leave.amount ?? 0) !== 1 ? 's' : ''} · Full Day`;
 
             await this.emailService.sendEmail(
                 [{ email: employee.reportingManagerEmail, name: employee.reportingManagerName }],
-                `New ${leave.leaveTypeName || 'Leave'} Request by ${employee.name}`,
+                `New ${leaveTypeLabel} Request by ${employee.name}`,
                 `
                     <p>Hello ${employee.reportingManagerName},</p>
-                    <p><strong>${employee.name}</strong> has submitted a new <strong>${leave.leaveTypeName || 'Leave'}</strong> request:</p>
+                    <p><strong>${employee.name}</strong> has submitted a new leave request:</p>
                     <ul>
-                        ${isHourly ? `
-                            <li><strong>Date:</strong> ${this.formatDate(leave.startDate)}</li>
-                            <li><strong>Start Time:</strong> ${leave.startTime}</li>
-                            <li><strong>End Time:</strong> ${leave.endTime}</li>
-                        ` : `
-                            <li><strong>Start Date:</strong> ${this.formatDate(leave.startDate)}</li>
-                            <li><strong>End Date:</strong> ${this.formatDate(leave.endDate)}</li>
-                        `}
+                        <li><strong>Leave Type:</strong> ${leaveTypeLabel}</li>
+                        <li><strong>Date:</strong> ${dateLine}</li>
+                        <li><strong>Duration:</strong> ${durationLine}</li>
                         ${leave.note ? `<li><strong>Note:</strong> ${leave.note}</li>` : ''}
                     </ul>
 
