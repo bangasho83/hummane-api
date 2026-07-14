@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS users (
   email text NOT NULL UNIQUE,
   password text,
   company_id uuid,
+  role text DEFAULT 'member',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -239,7 +240,29 @@ CREATE TABLE IF NOT EXISTS feedback_entries (
   subject_id uuid NOT NULL,
   subject_name text,
   author_id uuid,
+  author_name text,
   answers jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS resource_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL,
+  employee_id uuid NOT NULL,
+  title text NOT NULL,
+  category text NOT NULL,
+  description text,
+  goal_alignment text,
+  priority text NOT NULL DEFAULT 'normal',
+  estimated_cost numeric(12, 2),
+  product_url text,
+  attachments jsonb,
+  status text NOT NULL DEFAULT 'pending',
+  reviewer_note text,
+  status_history jsonb NOT NULL DEFAULT '[]'::jsonb,
+  employee_name text,
+  employee_email text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -338,6 +361,12 @@ ALTER TABLE feedback_entries
   ADD CONSTRAINT feedback_entries_card_fk
   FOREIGN KEY (card_id) REFERENCES feedback_cards (id) ON DELETE CASCADE;
 
+ALTER TABLE resource_requests
+  ADD CONSTRAINT resource_requests_company_fk
+  FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
+  ADD CONSTRAINT resource_requests_employee_fk
+  FOREIGN KEY (employee_id) REFERENCES employees (id) ON DELETE CASCADE;
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users (company_id);
 CREATE INDEX IF NOT EXISTS idx_user_invitations_company_id ON user_invitations (company_id);
@@ -361,5 +390,8 @@ CREATE INDEX IF NOT EXISTS idx_holidays_company_id ON holidays (company_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_cards_company_id ON feedback_cards (company_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_entries_company_id ON feedback_entries (company_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_entries_subject ON feedback_entries (subject_type, subject_id);
+CREATE INDEX IF NOT EXISTS idx_resource_requests_company_id ON resource_requests (company_id);
+CREATE INDEX IF NOT EXISTS idx_resource_requests_employee_id ON resource_requests (employee_id);
+CREATE INDEX IF NOT EXISTS idx_resource_requests_status ON resource_requests (company_id, status);
 
 COMMIT;

@@ -18,6 +18,7 @@ import { InvitationsModule } from './invitations/invitations.module';
 import { PublicModule } from './public/public.module';
 import { FirestoreModule } from './firestore/firestore.module';
 import { EmailModule } from './email/email.module';
+import { ResourceRequestsModule } from './resources/resource-requests.module';
 
 @Module({
     imports: [
@@ -42,6 +43,7 @@ import { EmailModule } from './email/email.module';
         PublicModule,
         FirestoreModule,
         EmailModule,
+        ResourceRequestsModule,
     ],
     controllers: [],
     providers: [],

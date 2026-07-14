@@ -477,6 +477,41 @@ curl -X GET "$BASE_URL/documents/YOUR_DOCUMENT_ID" \
 curl -X DELETE "$BASE_URL/documents/YOUR_DOCUMENT_ID" \
   -H "Authorization: Bearer $TOKEN"
 
+## Resource Categories
+### GET /resource-categories
+curl -X GET "$BASE_URL/resource-categories"
+
+## Resource Requests
+### POST /resource-requests
+curl -X POST "$BASE_URL/resource-requests" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"MacBook Pro 16","category":"Hardware","description":"Need M3 Max for local ML training","goalAlignment":"Faster model iterations","priority":"high","estimatedCost":3500,"productUrl":"https://apple.com"}'
+
+### GET /resource-requests
+curl -X GET "$BASE_URL/resource-requests" \
+  -H "Authorization: Bearer $TOKEN"
+
+### GET /resource-requests/:id
+curl -X GET "$BASE_URL/resource-requests/YOUR_REQUEST_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+### PUT /resource-requests/:id
+curl -X PUT "$BASE_URL/resource-requests/YOUR_REQUEST_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"description":"Actually need M3 Pro instead of Max","estimatedCost":2500}'
+
+### PATCH /resource-requests/:id/status
+curl -X PATCH "$BASE_URL/resource-requests/YOUR_REQUEST_ID/status" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"approved","reviewerNote":"Approved, budget allocated for Q3."}'
+
+### DELETE /resource-requests/:id
+curl -X DELETE "$BASE_URL/resource-requests/YOUR_REQUEST_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
 ## Public API
 Public endpoints for use on external company portals. Authentication is handled via the `x-api-key` header.
 

@@ -308,3 +308,32 @@ export const EmployeeDocumentSchema = z.object({
 export type FeedbackCard = z.infer<typeof FeedbackCardSchema>;
 export type FeedbackEntry = z.infer<typeof FeedbackEntrySchema>;
 export type EmployeeDocument = z.infer<typeof EmployeeDocumentSchema>;
+
+// Resource Requests
+export const ResourceRequestSchema = z.object({
+    id: z.string().optional(),
+    companyId: z.string().min(1),
+    employeeId: z.string().min(1),
+    title: z.string().min(1),
+    category: z.string().min(1),
+    description: z.string().optional(),
+    goalAlignment: z.string().optional(),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+    estimatedCost: TwoDecimalNumberSchema.optional(),
+    productUrl: z.string().url().optional().or(z.string().length(0)),
+    status: z.string().optional(),
+    reviewerNote: z.string().optional(),
+    statusHistory: z.array(z.any()).optional(), // Store as generic jsonb in db
+    attachments: DocumentFilesSchema.optional(),
+    employeeName: z.string().optional(),
+    employeeEmail: z.string().optional(),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
+});
+
+export const ResourceRequestStatusPatchSchema = z.object({
+    status: z.enum(['approved', 'rejected', 'fulfilled', 'cancelled']),
+    reviewerNote: z.string().optional(),
+});
+
+export type ResourceRequest = z.infer<typeof ResourceRequestSchema>;
