@@ -87,13 +87,21 @@ export class ResourceRequestsService {
                 ]
             );
 
-            // Notify Admin
-            this.notifyAdmins(companyId, `New resource request from ${empName}`, `
+            const emailHtml = `
                 <p><strong>${empName}</strong> has submitted a new resource request.</p>
-                <p><strong>Title:</strong> ${data.title}</p>
-                <p><strong>Category:</strong> ${data.category}</p>
+                <ul>
+                    <li><strong>Title:</strong> ${data.title}</li>
+                    <li><strong>Category:</strong> ${data.category}</li>
+                    <li><strong>Priority:</strong> ${data.priority || 'normal'}</li>
+                    ${data.description ? `<li><strong>Description:</strong> ${data.description}</li>` : ''}
+                    ${data.goalAlignment ? `<li><strong>Goal Alignment:</strong> ${data.goalAlignment}</li>` : ''}
+                    ${data.estimatedCost ? `<li><strong>Estimated Cost:</strong> $${data.estimatedCost}</li>` : ''}
+                    ${data.productUrl ? `<li><strong>Product URL:</strong> <a href="${data.productUrl}">${data.productUrl}</a></li>` : ''}
+                </ul>
                 <p>Please review it in the HR portal.</p>
-            `);
+            `;
+
+            this.notifyApprovers(companyId, employeeId, `New resource request from ${empName}`, emailHtml);
 
             return this.mapToCamelCase(result.rows[0]);
         });
@@ -297,16 +305,32 @@ export class ResourceRequestsService {
         };
     }
 
-    private async notifyAdmins(companyId: string, subject: string, html: string) {
-        // Ideally we fetch admin emails here. For simplicity, we just log or broadcast to an admin group.
-        // If there's an 'owner' or 'admin' role in users:
+    private async notifyApprovers(companyId: string, employeeId: string, subject: string, html: string) {
+        const recipientsMap = new Map<string, string>();
+
+        // 1. Get company admins & owners
         const adminsRes = await this.pg.query(
             `SELECT email, name FROM employees e JOIN users u ON e.user_id = u.id WHERE u.company_id = $1 AND u.role IN ('admin', 'owner')`,
             [companyId]
         );
-        const adminRecipients = adminsRes.rows.map((r: any) => ({ email: r.email, name: r.name }));
-        if (adminRecipients.length > 0) {
-            this.emailService.sendEmail(adminRecipients, subject, html);
+        adminsRes.rows.forEach((r: any) => recipientsMap.set(r.email, r.name));
+
+        // 2. Get the employee's reporting manager
+        const managerRes = await this.pg.query(
+            `SELECT m.email, m.name FROM employees e 
+             JOIN employees m ON e.reporting_manager_id = m.id 
+             WHERE e.id = $1 AND e.company_id = $2`,
+            [employeeId, companyId]
+        );
+        if (managerRes.rowCount > 0) {
+            const manager = managerRes.rows[0] as any;
+            recipientsMap.set(manager.email, manager.name);
+        }
+
+        const recipients = Array.from(recipientsMap.entries()).map(([email, name]) => ({ email, name }));
+
+        if (recipients.length > 0) {
+            this.emailService.sendEmail(recipients, subject, html);
         }
     }
 }
