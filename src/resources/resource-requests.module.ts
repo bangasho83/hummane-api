@@ -34,7 +34,7 @@ export class ResourceRequestsService {
     ) { }
 
     async create(companyId: string, employeeId: string, data: ResourceRequest): Promise<ResourceRequest> {
-        return this.pg.withTransaction(async (client) => {
+        const created = await this.pg.withTransaction(async (client) => {
             // Validate category
             const categoryObj = RESOURCE_CATEGORIES.find((c) => c.name === data.category);
             if (!categoryObj) {
@@ -101,10 +101,21 @@ export class ResourceRequestsService {
                 <p>Please review it in the HR portal.</p>
             `;
 
-            this.notifyApprovers(companyId, employeeId, `New resource request from ${empName}`, emailHtml);
-
-            return this.mapToCamelCase(result.rows[0]);
+            return {
+                request: this.mapToCamelCase(result.rows[0]),
+                empName,
+                emailHtml,
+            };
         });
+
+        await this.notifyApprovers(
+            companyId,
+            employeeId,
+            `New resource request from ${created.empName}`,
+            created.emailHtml,
+        );
+
+        return created.request;
     }
 
     async findAllForCompany(companyId: string): Promise<ResourceRequest[]> {
@@ -180,7 +191,7 @@ export class ResourceRequestsService {
     }
 
     async patchStatus(companyId: string, adminEmployeeId: string, id: string, status: string, reviewerNote?: string): Promise<ResourceRequest> {
-        return this.pg.withTransaction(async (client) => {
+        const change = await this.pg.withTransaction(async (client) => {
             const existingRes = await client.query(
                 `SELECT * FROM resource_requests WHERE id = $1 AND company_id = $2`,
                 [id, companyId]
@@ -191,7 +202,12 @@ export class ResourceRequestsService {
             const existing = existingRes.rows[0];
 
             if (existing.status === status) {
-                return this.mapToCamelCase(existing);
+                return {
+                    request: this.mapToCamelCase(existing),
+                    previousStatus: existing.status,
+                    recipients: [],
+                    changed: false,
+                };
             }
 
             const adminRes = await client.query(`SELECT name FROM employees WHERE id = $1`, [adminEmployeeId]);
@@ -219,31 +235,49 @@ export class ResourceRequestsService {
                 [status, reviewerNote || null, JSON.stringify(history), id, companyId]
             );
 
-            // Notify Employee
-            let subject = '';
-            let message = '';
-            if (status === 'approved') {
-                subject = 'Your resource request has been approved';
-                message = `Your request for <strong>${existing.title}</strong> has been approved.`;
-            } else if (status === 'rejected') {
-                subject = 'Update on your resource request';
-                message = `Your request for <strong>${existing.title}</strong> has been rejected.`;
-                if (reviewerNote) message += `<br>Reason: ${reviewerNote}`;
-            } else if (status === 'fulfilled') {
-                subject = 'Your resource request has been fulfilled';
-                message = `Your request for <strong>${existing.title}</strong> has been fulfilled.`;
+            const contactRes = await client.query(
+                `SELECT
+                    e.email AS employee_email,
+                    e.name AS employee_name,
+                    m.email AS manager_email,
+                    m.name AS manager_name
+                 FROM employees e
+                 LEFT JOIN employees m
+                   ON m.id = e.reporting_manager_id AND m.company_id = e.company_id
+                 WHERE e.id = $1 AND e.company_id = $2`,
+                [existing.employee_id, companyId]
+            );
+
+            const contact = contactRes.rows[0] || {};
+            const recipientsMap = new Map<string, string>();
+            const employeeEmail = contact.employee_email || existing.employee_email;
+            const employeeName = contact.employee_name || existing.employee_name;
+
+            if (employeeEmail) {
+                recipientsMap.set(employeeEmail, employeeName);
+            }
+            if (contact.manager_email) {
+                recipientsMap.set(contact.manager_email, contact.manager_name);
             }
 
-            if (subject && existing.employee_email) {
-                this.emailService.sendEmail(
-                    { email: existing.employee_email, name: existing.employee_name },
-                    subject,
-                    `<p>Hi ${existing.employee_name},</p><p>${message}</p>`
-                );
-            }
-
-            return this.mapToCamelCase(result.rows[0]);
+            return {
+                request: this.mapToCamelCase(result.rows[0]),
+                previousStatus: existing.status,
+                recipients: Array.from(recipientsMap.entries()).map(([email, name]) => ({ email, name })),
+                changed: true,
+            };
         });
+
+        if (change.changed && change.recipients.length > 0) {
+            const statusLabel = this.formatLabel(change.request.status || status);
+            await this.emailService.sendEmail(
+                change.recipients,
+                `Resource request ${statusLabel}: ${change.request.title}`,
+                this.buildStatusUpdateEmail(change.request, change.previousStatus, reviewerNote)
+            );
+        }
+
+        return change.request;
     }
 
     async remove(companyId: string, employeeId: string, id: string, isAdmin: boolean): Promise<void> {
@@ -305,6 +339,48 @@ export class ResourceRequestsService {
         };
     }
 
+    private buildStatusUpdateEmail(request: ResourceRequest, previousStatus: string, reviewerNote?: string): string {
+        const status = this.formatLabel(request.status || 'updated');
+        const previous = this.formatLabel(previousStatus);
+        const attachments = request.attachments?.files?.length || 0;
+        const productUrl = request.productUrl ? this.escapeHtml(request.productUrl) : '';
+
+        return `
+            <p>Hello,</p>
+            <p>The resource request submitted by <strong>${this.escapeHtml(request.employeeName || 'Employee')}</strong>
+               has changed from <strong>${previous}</strong> to <strong>${status}</strong>.</p>
+            <h3>Request details</h3>
+            <ul>
+                <li><strong>Title:</strong> ${this.escapeHtml(request.title)}</li>
+                <li><strong>Category:</strong> ${this.escapeHtml(request.category)}</li>
+                <li><strong>Description:</strong> ${this.escapeHtml(request.description || 'Not provided')}</li>
+                <li><strong>Goal Alignment:</strong> ${this.escapeHtml(request.goalAlignment || 'Not provided')}</li>
+                <li><strong>Priority:</strong> ${this.escapeHtml(this.formatLabel(request.priority || 'normal'))}</li>
+                <li><strong>Estimated Cost:</strong> ${request.estimatedCost !== undefined ? `$${this.escapeHtml(request.estimatedCost)}` : 'Not provided'}</li>
+                <li><strong>Product URL:</strong> ${productUrl ? `<a href="${productUrl}">${productUrl}</a>` : 'Not provided'}</li>
+                <li><strong>Attachments:</strong> ${attachments ? `${attachments} file${attachments === 1 ? '' : 's'}` : 'None'}</li>
+                <li><strong>Status:</strong> ${status}</li>
+                <li><strong>Reviewer Note:</strong> ${this.escapeHtml(reviewerNote || request.reviewerNote || 'Not provided')}</li>
+            </ul>
+            <p>Please review the request in the HR portal if further action is required.</p>
+        `;
+    }
+
+    private formatLabel(value: string): string {
+        return value
+            .replace(/[_-]+/g, ' ')
+            .replace(/\b\w/g, (character) => character.toUpperCase());
+    }
+
+    private escapeHtml(value: unknown): string {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     private async notifyApprovers(companyId: string, employeeId: string, subject: string, html: string) {
         const recipientsMap = new Map<string, string>();
 
@@ -330,7 +406,7 @@ export class ResourceRequestsService {
         const recipients = Array.from(recipientsMap.entries()).map(([email, name]) => ({ email, name }));
 
         if (recipients.length > 0) {
-            this.emailService.sendEmail(recipients, subject, html);
+            await this.emailService.sendEmail(recipients, subject, html);
         }
     }
 }
