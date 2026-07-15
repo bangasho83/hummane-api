@@ -337,3 +337,83 @@ export const ResourceRequestStatusPatchSchema = z.object({
 });
 
 export type ResourceRequest = z.infer<typeof ResourceRequestSchema>;
+
+// Vendors
+export const VendorSchema = z.object({
+    id: z.string().optional(),
+    companyId: z.string().min(1),
+    name: z.string().min(1),
+    contactName: z.string().optional(),
+    email: z.string().email().optional().or(z.string().length(0)),
+    phone: z.string().optional(),
+    isActive: z.boolean().default(true),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
+});
+
+export type Vendor = z.infer<typeof VendorSchema>;
+
+// Resources (assets, subscriptions, services, expenses, events, reimbursements)
+export const ResourceTypeEnum = z.enum([
+    'physical_asset',
+    'subscription',
+    'service',
+    'expense',
+    'event',
+    'reimbursement',
+]);
+
+export const ResourceStatusEnum = z.enum([
+    'active',
+    'inactive',
+    'maintenance',
+    'lost',
+    'retired',
+]);
+
+export const ResourceAssignmentTypeEnum = z.enum([
+    'person',
+    'location',
+    'shared',
+    'company',
+    'unassigned',
+    'not_applicable',
+]);
+
+export const ResourceCostTypeEnum = z.enum(['one_time', 'recurring']);
+
+export const ResourceSchema = z.object({
+    id: z.string().optional(),
+    companyId: z.string().min(1),
+    vendorId: z.string().uuid().optional().or(z.string().length(0)),
+    resourceType: ResourceTypeEnum,
+    name: z.string().min(1),
+    category: z.string().min(1),
+    description: z.string().optional(),
+    identifier: z.string().optional(),
+    status: ResourceStatusEnum.default('active'),
+    assignmentType: ResourceAssignmentTypeEnum.default('not_applicable'),
+    assignedToEmployeeId: z.string().uuid().optional().or(z.string().length(0)),
+    location: z.string().optional(),
+    assignedAt: TimestampSchema.optional(),
+    assignmentHistory: z.array(z.any()).optional(),
+    costAmount: TwoDecimalNumberSchema.optional(),
+    costType: ResourceCostTypeEnum.optional(),
+    expenseDate: IsoDateSchema.optional().or(z.string().length(0)),
+    paidByEmployeeId: z.string().uuid().optional().or(z.string().length(0)),
+    isSettled: z.boolean().default(true),
+    attachments: DocumentFilesSchema.optional(),
+    details: z.record(z.string(), z.any()).optional(),
+    createdBy: z.string().uuid().optional().or(z.string().length(0)),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
+});
+
+export const ResourceAssignmentPatchSchema = z.object({
+    assignmentType: ResourceAssignmentTypeEnum,
+    assignedToEmployeeId: z.string().uuid().optional().or(z.string().length(0)),
+    location: z.string().optional(),
+    note: z.string().optional(),
+});
+
+export type Resource = z.infer<typeof ResourceSchema>;

@@ -512,6 +512,107 @@ curl -X PATCH "$BASE_URL/resource-requests/YOUR_REQUEST_ID/status" \
 curl -X DELETE "$BASE_URL/resource-requests/YOUR_REQUEST_ID" \
   -H "Authorization: Bearer $TOKEN"
 
+## Vendors
+Lightweight supplier/merchant directory, scoped to the company. `companyId` is
+enforced from the JWT. Deactivate vendors with `isActive:false` instead of
+deleting them to preserve links from historical resources.
+
+### POST /vendors
+curl -X POST "$BASE_URL/vendors" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Apple Authorized Reseller","contactName":"Sales Desk","email":"accounts@example.com","phone":"+123456789"}'
+
+### GET /vendors
+curl -X GET "$BASE_URL/vendors" \
+  -H "Authorization: Bearer $TOKEN"
+
+### GET /vendors/:id
+curl -X GET "$BASE_URL/vendors/YOUR_VENDOR_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+### PUT /vendors/:id
+curl -X PUT "$BASE_URL/vendors/YOUR_VENDOR_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"+199999999","isActive":false}'
+
+### DELETE /vendors/:id
+curl -X DELETE "$BASE_URL/vendors/YOUR_VENDOR_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+## Resources
+A single shared register for physical assets, subscriptions, services,
+expenses, events, and reimbursements. `companyId` and `createdBy` are taken
+from the JWT. `category` must be one of `GET /resource-categories`.
+
+Field reference:
+- `resourceType`: `physical_asset` | `subscription` | `service` | `expense` | `event` | `reimbursement`
+- `status`: `active` | `inactive` | `maintenance` | `lost` | `retired`
+- `assignmentType`: `person` | `location` | `shared` | `company` | `unassigned` | `not_applicable`
+- `costType`: `one_time` | `recurring`
+- `isSettled`: `false` for an employee-paid expense awaiting reimbursement
+- `attachments`: `{ "files": ["<url>", ...] }` for receipts/invoices/photos
+- `details`: free-form JSON (brand, model, warranty, invoice number, seats, notes)
+
+### POST /resources (asset assigned to an employee)
+curl -X POST "$BASE_URL/resources" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"resourceType":"physical_asset","name":"MacBook Pro 14","category":"Hardware","identifier":"HUM-MBP-00124","vendorId":"YOUR_VENDOR_ID","assignmentType":"person","assignedToEmployeeId":"YOUR_EMPLOYEE_ID","costAmount":250000,"costType":"one_time","details":{"brand":"Apple","model":"M4","warrantyExpiresOn":"2027-01-14"}}'
+
+### POST /resources (recurring subscription)
+curl -X POST "$BASE_URL/resources" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"resourceType":"subscription","name":"ChatGPT","category":"Software & Subscriptions","vendorId":"YOUR_VENDOR_ID","assignmentType":"shared","costAmount":150,"costType":"recurring"}'
+
+### POST /resources (fuel reimbursement paid by an employee)
+curl -X POST "$BASE_URL/resources" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"resourceType":"reimbursement","name":"Fuel reimbursement","category":"Travel","assignmentType":"not_applicable","costAmount":8000,"costType":"one_time","expenseDate":"2026-07-10","paidByEmployeeId":"YOUR_EMPLOYEE_ID","isSettled":false,"attachments":{"files":["https://example.com/fuel-receipt.jpg"]}}'
+
+### POST /resources (monthly utility / vendor bill)
+curl -X POST "$BASE_URL/resources" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"resourceType":"expense","name":"Office electricity - July","category":"Utilities","vendorId":"YOUR_VENDOR_ID","assignmentType":"company","costAmount":45000,"costType":"one_time","expenseDate":"2026-07-01","attachments":{"files":["https://example.com/electricity-bill.pdf"]}}'
+
+### GET /resources
+Supports filters: `resourceType`, `status`, `assignedToEmployeeId`, `vendorId`, `limit`.
+curl -X GET "$BASE_URL/resources?resourceType=physical_asset&status=active" \
+  -H "Authorization: Bearer $TOKEN"
+
+### GET /resources (all assets held by an employee)
+curl -X GET "$BASE_URL/resources?assignedToEmployeeId=YOUR_EMPLOYEE_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+### GET /resources/:id
+curl -X GET "$BASE_URL/resources/YOUR_RESOURCE_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+### PUT /resources/:id
+Update fields such as status, cost, vendor, details, attachments, or settlement.
+Does not change assignment (use the assignment endpoint for that).
+curl -X PUT "$BASE_URL/resources/YOUR_RESOURCE_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"maintenance","isSettled":true}'
+
+### PATCH /resources/:id/assignment
+Reassign or return a resource. The current assignment (if any) is appended to
+`assignmentHistory` before the new one is applied. Use `assignmentType`
+`unassigned` to return an item to inventory.
+curl -X PATCH "$BASE_URL/resources/YOUR_RESOURCE_ID/assignment" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"assignmentType":"person","assignedToEmployeeId":"YOUR_EMPLOYEE_ID","note":"Handed over after onboarding"}'
+
+### DELETE /resources/:id
+curl -X DELETE "$BASE_URL/resources/YOUR_RESOURCE_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
 ## Public API
 Public endpoints for use on external company portals. Authentication is handled via the `x-api-key` header.
 

@@ -19,6 +19,8 @@ import { PublicModule } from './public/public.module';
 import { FirestoreModule } from './firestore/firestore.module';
 import { EmailModule } from './email/email.module';
 import { ResourceRequestsModule } from './resources/resource-requests.module';
+import { VendorsModule } from './resources/vendors.module';
+import { ResourcesModule } from './resources/resources.module';
 
 @Module({
     imports: [
@@ -44,6 +46,8 @@ import { ResourceRequestsModule } from './resources/resource-requests.module';
         FirestoreModule,
         EmailModule,
         ResourceRequestsModule,
+        VendorsModule,
+        ResourcesModule,
     ],
     controllers: [],
     providers: [],
