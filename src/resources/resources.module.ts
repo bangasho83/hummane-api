@@ -260,7 +260,7 @@ export class ResourcesService {
             const hadAssignment =
                 existing.assignment_type !== 'not_applicable' &&
                 existing.assignment_type !== 'unassigned' &&
-                (existing.assigned_to_employee_id || existing.location);
+                existing.assigned_to_employee_id;
 
             if (hadAssignment) {
                 let previousName: string | null = null;

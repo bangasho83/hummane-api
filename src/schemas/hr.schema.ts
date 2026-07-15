@@ -373,7 +373,6 @@ export const ResourceStatusEnum = z.enum([
 
 export const ResourceAssignmentTypeEnum = z.enum([
     'person',
-    'location',
     'shared',
     'company',
     'unassigned',

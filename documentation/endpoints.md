@@ -549,7 +549,7 @@ from the JWT. `category` must be one of `GET /resource-categories`.
 Field reference:
 - `resourceType`: `physical_asset` | `subscription` | `service` | `expense` | `event` | `reimbursement`
 - `status`: `active` | `inactive` | `maintenance` | `lost` | `retired`
-- `assignmentType`: `person` | `location` | `shared` | `company` | `unassigned` | `not_applicable`
+- `assignmentType`: `person` | `shared` | `company` | `unassigned` | `not_applicable`
 - `costType`: `one_time` | `recurring`
 - `isSettled`: `false` for an employee-paid expense awaiting reimbursement
 - `attachments`: `{ "files": ["<url>", ...] }` for receipts/invoices/photos
