@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ResourcesService } from '../src/resources/resources.module';
+import { ResourcesController, ResourcesService } from '../src/resources/resources.module';
 
 function makeResourceRow(overrides: Record<string, any> = {}) {
     return {
@@ -72,6 +72,97 @@ test('findAll builds filtered query for an employee', async () => {
         'employee-1',
         25,
     ]);
+});
+
+test('findAll filters reimbursements by the employee who paid', async () => {
+    const captured: { sql: string; params: unknown[] }[] = [];
+    const pg = {
+        query: async (sql: string, params: unknown[]) => {
+            captured.push({ sql, params });
+            return { rowCount: 0, rows: [] };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await service.findAll('company-1', 100, {
+        resourceType: 'reimbursement',
+        paidByEmployeeId: 'employee-1',
+    });
+
+    assert.match(captured[0].sql, /resource_type = \$2/);
+    assert.match(captured[0].sql, /paid_by_employee_id = \$3/);
+    assert.deepEqual(captured[0].params, ['company-1', 'reimbursement', 'employee-1', 100]);
+});
+
+test('member reimbursement creation forces employee ownership and pending payment', async () => {
+    const companyId = '11111111-1111-4111-8111-111111111111';
+    const employeeId = '22222222-2222-4222-8222-222222222222';
+    let created: any;
+    const service = {
+        create: async (data: any) => { created = data; return data; },
+    };
+    const controller = new ResourcesController(service as any);
+
+    await controller.create({
+        companyId: '33333333-3333-4333-8333-333333333333',
+        createdBy: '44444444-4444-4444-8444-444444444444',
+        resourceType: 'reimbursement',
+        name: 'Fuel reimbursement',
+        category: 'Other',
+        assignmentType: 'person',
+        assignedToEmployeeId: '55555555-5555-4555-8555-555555555555',
+        paidByEmployeeId: '55555555-5555-4555-8555-555555555555',
+        isSettled: true,
+        costAmount: 8000,
+        costType: 'one_time',
+        expenseDate: '2026-07-15',
+    } as any, {
+        user: { companyId, employeeId, role: 'member' },
+    });
+
+    assert.equal(created.companyId, companyId);
+    assert.equal(created.createdBy, employeeId);
+    assert.equal(created.resourceType, 'reimbursement');
+    assert.equal(created.assignmentType, 'not_applicable');
+    assert.equal(created.assignedToEmployeeId, undefined);
+    assert.equal(created.paidByEmployeeId, employeeId);
+    assert.equal(created.isSettled, false);
+    assert.equal(created.status, 'active');
+});
+
+test('member cannot create a non-reimbursement resource', () => {
+    const controller = new ResourcesController({ create: async () => null } as any);
+    assert.throws(
+        () => controller.create({
+            resourceType: 'expense', name: 'Lunch', category: 'Other',
+        } as any, {
+            user: { companyId: 'company-1', employeeId: 'employee-1', role: 'member' },
+        }),
+        /Members can only submit reimbursements/,
+    );
+});
+
+test('member list query is scoped to their reimbursements', async () => {
+    let filters: any;
+    const service = {
+        findAll: async (_companyId: string, _limit: number, value: any) => { filters = value; return []; },
+    };
+    const controller = new ResourcesController(service as any);
+
+    await controller.findAll(
+        { user: { companyId: 'company-1', employeeId: 'employee-1', role: 'member' } },
+        '100',
+        'reimbursement',
+        undefined,
+        'other-employee',
+        undefined,
+        undefined,
+    );
+
+    assert.deepEqual(filters, {
+        resourceType: 'reimbursement',
+        paidByEmployeeId: 'employee-1',
+    });
 });
 
 test('reassign moves the previous assignment into history', async () => {

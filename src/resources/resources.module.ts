@@ -14,6 +14,7 @@ import {
     Injectable,
     BadRequestException,
     NotFoundException,
+    ForbiddenException,
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthGuard } from '../auth/auth.guard';
@@ -110,6 +111,7 @@ export class ResourcesService {
             resourceType?: string;
             status?: string;
             assignedToEmployeeId?: string;
+            paidByEmployeeId?: string;
             vendorId?: string;
         } = {},
     ) {
@@ -128,6 +130,10 @@ export class ResourcesService {
         if (filters.assignedToEmployeeId) {
             conditions.push(`assigned_to_employee_id = $${index++}`);
             values.push(filters.assignedToEmployeeId);
+        }
+        if (filters.paidByEmployeeId) {
+            conditions.push(`paid_by_employee_id = $${index++}`);
+            values.push(filters.paidByEmployeeId);
         }
         if (filters.vendorId) {
             conditions.push(`vendor_id = $${index++}`);
@@ -327,13 +333,33 @@ export class ResourcesService {
 export class ResourcesController {
     constructor(private service: ResourcesService) { }
 
+    private isAdmin(user: any): boolean {
+        return user.role === 'admin' || user.role === 'owner';
+    }
+
     @Post()
     create(@Body() data: Resource, @Req() req: any) {
-        data.companyId = req.user.companyId;
-        if (!data.createdBy) {
-            data.createdBy = req.user.employeeId;
+        const input: Resource = {
+            ...data,
+            companyId: req.user.companyId,
+            createdBy: req.user.employeeId,
+        };
+
+        if (!this.isAdmin(req.user)) {
+            if (!req.user.employeeId) {
+                throw new ForbiddenException('An employee profile is required');
+            }
+            if (input.resourceType !== 'reimbursement') {
+                throw new ForbiddenException('Members can only submit reimbursements');
+            }
+            input.assignmentType = 'not_applicable';
+            input.assignedToEmployeeId = undefined;
+            input.paidByEmployeeId = req.user.employeeId;
+            input.isSettled = false;
+            input.status = 'active';
         }
-        const v = ResourceSchema.safeParse(data);
+
+        const v = ResourceSchema.safeParse(input);
         if (!v.success) {
             throw new BadRequestException(v.error.issues);
         }
@@ -347,23 +373,39 @@ export class ResourcesController {
         @Query('resourceType') resourceType?: string,
         @Query('status') status?: string,
         @Query('assignedToEmployeeId') assignedToEmployeeId?: string,
+        @Query('paidByEmployeeId') paidByEmployeeId?: string,
         @Query('vendorId') vendorId?: string,
     ) {
-        return this.service.findAll(req.user.companyId, parseLimit(limit), {
-            resourceType,
-            status,
-            assignedToEmployeeId,
-            vendorId,
-        });
+        const memberFilters = resourceType === 'reimbursement'
+            ? { resourceType: 'reimbursement', paidByEmployeeId: req.user.employeeId }
+            : { resourceType, status, assignedToEmployeeId: req.user.employeeId, vendorId };
+        return this.service.findAll(
+            req.user.companyId,
+            parseLimit(limit),
+            this.isAdmin(req.user)
+                ? { resourceType, status, assignedToEmployeeId, paidByEmployeeId, vendorId }
+                : memberFilters,
+        );
     }
 
     @Get(':id')
-    findOne(@Param('id') id: string, @Req() req: any) {
-        return this.service.findOne(id, req.user.companyId);
+    async findOne(@Param('id') id: string, @Req() req: any) {
+        const resource = await this.service.findOne(id, req.user.companyId);
+        if (
+            !this.isAdmin(req.user)
+            && resource.assignedToEmployeeId !== req.user.employeeId
+            && !(resource.resourceType === 'reimbursement' && resource.paidByEmployeeId === req.user.employeeId)
+        ) {
+            throw new ForbiddenException('Access denied');
+        }
+        return resource;
     }
 
     @Put(':id')
     update(@Param('id') id: string, @Body() data: Partial<Resource>, @Req() req: any) {
+        if (!this.isAdmin(req.user)) {
+            throw new ForbiddenException('Only admins can update resources');
+        }
         const updateData = { ...data };
         delete (updateData as Partial<Resource>).companyId;
         return this.service.update(id, updateData, req.user.companyId);
@@ -371,6 +413,9 @@ export class ResourcesController {
 
     @Patch(':id/assignment')
     reassign(@Param('id') id: string, @Body() data: any, @Req() req: any) {
+        if (!this.isAdmin(req.user)) {
+            throw new ForbiddenException('Only admins can assign resources');
+        }
         const v = ResourceAssignmentPatchSchema.safeParse(data);
         if (!v.success) {
             throw new BadRequestException(v.error.issues);
@@ -385,6 +430,9 @@ export class ResourcesController {
 
     @Delete(':id')
     remove(@Param('id') id: string, @Req() req: any) {
+        if (!this.isAdmin(req.user)) {
+            throw new ForbiddenException('Only admins can delete resources');
+        }
         return this.service.delete(id, req.user.companyId);
     }
 }
