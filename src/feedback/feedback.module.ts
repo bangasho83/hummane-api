@@ -495,6 +495,89 @@ export class FeedbackEntriesController {
         private emailService: EmailService,
         private configService: ConfigService
     ) { }
+
+    private escapeHtml(value: unknown): string {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    private formatLabel(value: unknown): string {
+        return String(value ?? '')
+            .replace(/[_-]+/g, ' ')
+            .replace(/\b\w/g, (character) => character.toUpperCase());
+    }
+
+    private formatFeedbackDate(value: unknown): string {
+        const date = new Date(value as string | number | Date);
+        if (Number.isNaN(date.getTime())) return 'Not available';
+        return new Intl.DateTimeFormat('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'UTC',
+            timeZoneName: 'short',
+        }).format(date);
+    }
+
+    private buildFeedbackDetails(created: FeedbackEntry): string {
+        const answers = Array.isArray(created.answers) ? created.answers : [];
+        if (answers.length === 0) {
+            return '<p>No written or scored responses were included.</p>';
+        }
+
+        return answers.map((answer: any, index: number) => {
+            const question = answer?.question;
+            const prompt = question?.prompt || `Question ${index + 1}`;
+            const rawValue = answer?.answer ?? answer?.comment ?? answer?.score ?? 'Not answered';
+            const isScore = question?.kind === 'score';
+            const displayValue = isScore && rawValue !== 'Not answered'
+                ? `${rawValue} / 5`
+                : rawValue;
+
+            return `
+                <div style="margin: 0 0 18px; padding: 14px; background: #f7f7f7; border-radius: 6px;">
+                    <p style="margin: 0 0 6px;"><strong>${this.escapeHtml(prompt)}</strong></p>
+                    <p style="margin: 0; white-space: pre-wrap;">${this.escapeHtml(displayValue)}</p>
+                </div>
+            `;
+        }).join('');
+    }
+
+    private buildFeedbackEmail(created: FeedbackEntry, recipientName: string, feedbackLink: string): string {
+        const cardTitle = (created as any).card?.title || 'Feedback';
+        const authorName = (created as any).authorName || 'A teammate';
+        const subjectName = created.subjectName || recipientName;
+        const feedbackType = created.type ? this.formatLabel(created.type) : 'General';
+
+        return `
+            <html>
+                <body style="font-family: Arial, sans-serif; color: #202020; line-height: 1.5;">
+                    <p>Hi ${this.escapeHtml(recipientName)},</p>
+                    <p><strong>${this.escapeHtml(authorName)}</strong> shared feedback with you.</p>
+                    <table style="border-collapse: collapse; margin: 18px 0;">
+                        <tr><td style="padding: 4px 16px 4px 0;"><strong>Feedback</strong></td><td>${this.escapeHtml(cardTitle)}</td></tr>
+                        <tr><td style="padding: 4px 16px 4px 0;"><strong>About</strong></td><td>${this.escapeHtml(subjectName)}</td></tr>
+                        <tr><td style="padding: 4px 16px 4px 0;"><strong>From</strong></td><td>${this.escapeHtml(authorName)}</td></tr>
+                        <tr><td style="padding: 4px 16px 4px 0;"><strong>Type</strong></td><td>${this.escapeHtml(feedbackType)}</td></tr>
+                        <tr><td style="padding: 4px 16px 4px 0;"><strong>Submitted</strong></td><td>${this.escapeHtml(this.formatFeedbackDate(created.createdAt))}</td></tr>
+                    </table>
+                    <h3 style="margin-top: 24px;">Feedback details</h3>
+                    ${this.buildFeedbackDetails(created)}
+                    <p style="margin-top: 24px;">
+                        <a href="${this.escapeHtml(feedbackLink)}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Feedback</a>
+                    </p>
+                    <p style="font-size: 12px; color: #666;">Or copy this link: ${this.escapeHtml(feedbackLink)}</p>
+                </body>
+            </html>
+        `;
+    }
+
     @Post() async create(@Body() d: FeedbackEntry, @Req() req) {
         console.log(`[FeedbackLog] POST /feedback-entries hit by user ${req.user?.id}`);
         const user = req.user;
@@ -529,22 +612,13 @@ export class FeedbackEntriesController {
                 if (employee && employee.email) {
                     const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://app.hummane.com';
                     const feedbackLink = `${frontendUrl}/feedback/entries/${created.id}`; // Assuming this route exists
+                    const cardTitle = (created as any).card?.title || 'Feedback';
+                    const authorName = (created as any).authorName || 'A teammate';
 
                     await this.emailService.sendEmail(
                         { email: employee.email, name: employee.name },
-                        'You have received new feedback',
-                        `
-                        <html>
-                            <body>
-                                <h3>New Feedback Received</h3>
-                                <p>You have received new feedback on Hummane.</p>
-                                <p>
-                                    <a href="${feedbackLink}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Feedback</a>
-                                </p>
-                                <p>Or copy this link: ${feedbackLink}</p>
-                            </body>
-                        </html>
-                        `
+                        `New feedback from ${authorName}: ${cardTitle}`,
+                        this.buildFeedbackEmail(created, employee.name, feedbackLink)
                     );
                 }
             } catch (e) {
