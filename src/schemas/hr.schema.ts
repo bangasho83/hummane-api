@@ -332,7 +332,7 @@ export const ResourceRequestSchema = z.object({
 });
 
 export const ResourceRequestStatusPatchSchema = z.object({
-    status: z.enum(['approved', 'rejected', 'fulfilled', 'cancelled']),
+    status: z.enum(['in_review', 'approved', 'rejected', 'fulfilled', 'cancelled']),
     reviewerNote: z.string().optional(),
 });
 
