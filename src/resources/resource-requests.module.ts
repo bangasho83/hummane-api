@@ -14,6 +14,7 @@ import {
     BadRequestException,
     NotFoundException,
     ForbiddenException,
+    Logger,
 } from '@nestjs/common';
 import { PostgresService } from '../postgres/postgres.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -28,6 +29,8 @@ import { RESOURCE_CATEGORIES } from './resource-categories.constants';
 
 @Injectable()
 export class ResourceRequestsService {
+    private readonly logger = new Logger(ResourceRequestsService.name);
+
     constructor(
         private pg: PostgresService,
         private emailService: EmailService,
@@ -108,12 +111,16 @@ export class ResourceRequestsService {
             };
         });
 
-        await this.notifyApprovers(
-            companyId,
-            employeeId,
-            `New resource request from ${created.empName}`,
-            created.emailHtml,
-        );
+        try {
+            await this.notifyApprovers(
+                companyId,
+                employeeId,
+                `New resource request from ${created.empName}`,
+                created.emailHtml,
+            );
+        } catch (error) {
+            this.logger.error('Resource request created, but approver notification failed', error);
+        }
 
         return created.request;
     }
@@ -386,7 +393,7 @@ export class ResourceRequestsService {
 
         // 1. Get company admins & owners
         const adminsRes = await this.pg.query(
-            `SELECT email, name FROM employees e JOIN users u ON e.user_id = u.id WHERE u.company_id = $1 AND u.role IN ('admin', 'owner')`,
+            `SELECT e.email, e.name FROM employees e JOIN users u ON e.user_id = u.id WHERE u.company_id = $1 AND u.role IN ('admin', 'owner')`,
             [companyId]
         );
         adminsRes.rows.forEach((r: any) => recipientsMap.set(r.email, r.name));
