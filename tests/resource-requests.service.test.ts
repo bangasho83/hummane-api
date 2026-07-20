@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ResourceRequestsService } from '../src/resources/resource-requests.module';
+import { ResourceRequestStatusPatchSchema } from '../src/schemas/hr.schema';
 
 const existingRequest = {
     id: 'request-1',
@@ -73,8 +74,12 @@ function createService(nextStatus: string, currentStatus = 'pending') {
     };
 }
 
+test('accepts in_review as an admin resource request status', () => {
+    assert.deepEqual(ResourceRequestStatusPatchSchema.parse({ status: 'in_review' }), { status: 'in_review' });
+});
+
 test('emails employee and manager with the full form for every admin status change', async () => {
-    for (const status of ['approved', 'rejected', 'fulfilled', 'cancelled']) {
+    for (const status of ['in_review', 'approved', 'rejected', 'fulfilled', 'cancelled']) {
         const { service, sent } = createService(status);
 
         const result = await service.patchStatus(
@@ -92,9 +97,10 @@ test('emails employee and manager with the full form for every admin status chan
             { email: 'employee@example.com', name: 'Employee One' },
             { email: 'manager@example.com', name: 'Manager One' },
         ]);
-        assert.match(subject, new RegExp(status, 'i'));
+        const statusLabel = status.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+        assert.match(subject, new RegExp(statusLabel, 'i'));
         assert.match(html, /Pending/);
-        assert.match(html, new RegExp(status, 'i'));
+        assert.match(html, new RegExp(statusLabel, 'i'));
         assert.match(html, /&lt;Laptop&gt; replacement/);
         assert.match(html, /Equipment/);
         assert.match(html, /Current laptop is unreliable/);
