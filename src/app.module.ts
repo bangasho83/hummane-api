@@ -20,6 +20,7 @@ import { FirestoreModule } from './firestore/firestore.module';
 import { EmailModule } from './email/email.module';
 import { ResourceRequestsModule } from './resources/resource-requests.module';
 import { VendorsModule } from './resources/vendors.module';
+import { ResourceTemplatesModule } from './resources/resource-templates.module';
 import { ResourcesModule } from './resources/resources.module';
 
 @Module({
@@ -47,6 +48,7 @@ import { ResourcesModule } from './resources/resources.module';
         EmailModule,
         ResourceRequestsModule,
         VendorsModule,
+        ResourceTemplatesModule,
         ResourcesModule,
     ],
     controllers: [],

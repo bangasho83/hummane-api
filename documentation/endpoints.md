@@ -554,6 +554,27 @@ Field reference:
 - `isSettled`: `false` for an employee-paid expense awaiting reimbursement
 - `attachments`: `{ "files": ["<url>", ...] }` for receipts/invoices/photos
 - `details`: free-form JSON (brand, model, warranty, invoice number, seats, notes)
+- `resourceTemplateId`: optional reusable subscription/resource template reference. Template defaults are copied into the resource at creation time.
+
+## Resource Templates
+Templates are company-scoped reusable defaults. Archived templates remain linked to existing resources but cannot be used for new resources.
+
+### POST /resource-templates
+```bash
+curl -X POST "$BASE_URL/resource-templates" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Claude.ai","resourceType":"subscription","category":"Software & Subscriptions","defaultCostAmount":25,"defaultCostType":"recurring"}'
+```
+
+### GET /resource-templates?activeOnly=true
+Returns reusable templates for the current company.
+
+### PUT /resource-templates/:id
+Updates template defaults. Existing resources retain their copied values.
+
+### DELETE /resource-templates/:id
+Archives the template; it is not physically deleted.
 
 ### POST /resources (asset assigned to an employee)
 curl -X POST "$BASE_URL/resources" \
@@ -566,6 +587,15 @@ curl -X POST "$BASE_URL/resources" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"resourceType":"subscription","name":"ChatGPT","category":"Software & Subscriptions","vendorId":"YOUR_VENDOR_ID","assignmentType":"shared","costAmount":150,"costType":"recurring"}'
+
+### POST /resources (from a template)
+The template supplies name, category, vendor, price, cost type, and default details. Any explicitly provided resource fields override those defaults.
+```bash
+curl -X POST "$BASE_URL/resources" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"resourceTemplateId":"YOUR_TEMPLATE_ID","assignmentType":"person","assignedToEmployeeId":"YOUR_EMPLOYEE_ID","costAmount":25,"details":{"accountEmail":"employee@example.com"}}'
+```
 
 ### POST /resources (fuel reimbursement paid by an employee)
 curl -X POST "$BASE_URL/resources" \
@@ -587,6 +617,13 @@ curl -X GET "$BASE_URL/resources?resourceType=physical_asset&status=active" \
 ### GET /resources (all assets held by an employee)
 curl -X GET "$BASE_URL/resources?assignedToEmployeeId=YOUR_EMPLOYEE_ID" \
   -H "Authorization: Bearer $TOKEN"
+
+### GET /resources/reports/costs
+Owner-only subscription cost report. Supports `resourceType`, `status`, `employeeId`, and `resourceTemplateId` filters, and returns company totals grouped by template and employee.
+```bash
+curl -X GET "$BASE_URL/resources/reports/costs?resourceType=subscription&status=active" \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ### GET /resources/:id
 curl -X GET "$BASE_URL/resources/YOUR_RESOURCE_ID" \

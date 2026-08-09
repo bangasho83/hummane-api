@@ -13,6 +13,7 @@ import {
     UseGuards,
     Injectable,
     BadRequestException,
+    ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
@@ -34,6 +35,7 @@ export class ResourcesService {
     private selectFields = [
         'id',
         'company_id AS "companyId"',
+        'resource_template_id AS "resourceTemplateId"',
         'vendor_id AS "vendorId"',
         'resource_type AS "resourceType"',
         'name',
@@ -59,29 +61,56 @@ export class ResourcesService {
     ].join(', ');
 
     async create(data: Resource) {
-        if (!RESOURCE_CATEGORIES.find((c) => c.name === data.category)) {
+        let template: any = null;
+        if (data.resourceTemplateId) {
+            const templateResult = await this.postgres.query(
+                `SELECT * FROM resource_templates WHERE id = $1 AND company_id = $2 AND is_active = true LIMIT 1`,
+                [data.resourceTemplateId, data.companyId],
+            );
+            if (templateResult.rowCount === 0) {
+                throw new NotFoundException('Resource template not found or inactive');
+            }
+            template = templateResult.rows[0];
+        }
+
+        const name = data.name || template?.name;
+        const category = data.category || template?.category;
+        const resourceType = data.resourceType || template?.resource_type;
+        const vendorId = data.vendorId || template?.vendor_id;
+        const costAmount = data.costAmount ?? template?.default_cost_amount;
+        const costType = data.costType || template?.default_cost_type;
+        const details = {
+            ...(template?.default_details && typeof template.default_details === 'object' ? template.default_details : {}),
+            ...(data.details || {}),
+        };
+
+        if (!name || !category) {
+            throw new BadRequestException('Name and category are required');
+        }
+        if (!RESOURCE_CATEGORIES.find((c) => c.name === category)) {
             throw new BadRequestException('Invalid category');
         }
 
         const id = data.id || uuidv4();
         const result = await this.postgres.query<Resource>(
             `INSERT INTO resources (
-                id, company_id, vendor_id, resource_type, name, category, description,
+                id, company_id, resource_template_id, vendor_id, resource_type, name, category, description,
                 identifier, status, assignment_type, assigned_to_employee_id, location,
                 assigned_at, assignment_history, cost_amount, cost_type, expense_date,
                 paid_by_employee_id, is_settled, attachments, details, created_by
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                $15, $16, $17, $18, $19, $20, $21, $22
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                $16, $17, $18, $19, $20, $21, $22, $23
             )
             RETURNING ${this.selectFields}`,
             [
                 id,
                 data.companyId,
-                data.vendorId || null,
-                data.resourceType,
-                data.name,
-                data.category,
+                data.resourceTemplateId || null,
+                vendorId || null,
+                resourceType,
+                name,
+                category,
                 data.description ?? null,
                 data.identifier ?? null,
                 data.status ?? 'active',
@@ -90,13 +119,13 @@ export class ResourcesService {
                 data.location ?? null,
                 data.assignedAt ?? (data.assignedToEmployeeId ? new Date().toISOString() : null),
                 JSON.stringify(data.assignmentHistory ?? []),
-                data.costAmount ?? null,
-                data.costType ?? null,
+                costAmount ?? null,
+                costType ?? null,
                 data.expenseDate || null,
                 data.paidByEmployeeId || null,
                 data.isSettled ?? true,
                 data.attachments ? JSON.stringify(data.attachments) : JSON.stringify({ files: [] }),
-                data.details ? JSON.stringify(data.details) : JSON.stringify({}),
+                JSON.stringify(details),
                 data.createdBy || null,
             ],
         );
@@ -111,6 +140,7 @@ export class ResourcesService {
             status?: string;
             assignedToEmployeeId?: string;
             vendorId?: string;
+            resourceTemplateId?: string;
         } = {},
     ) {
         const conditions = ['company_id = $1'];
@@ -132,6 +162,10 @@ export class ResourcesService {
         if (filters.vendorId) {
             conditions.push(`vendor_id = $${index++}`);
             values.push(filters.vendorId);
+        }
+        if (filters.resourceTemplateId) {
+            conditions.push(`resource_template_id = $${index++}`);
+            values.push(filters.resourceTemplateId);
         }
 
         values.push(limit);
@@ -167,6 +201,7 @@ export class ResourcesService {
 
         const columnMap: Record<string, string> = {
             vendorId: 'vendor_id',
+            resourceTemplateId: 'resource_template_id',
             resourceType: 'resource_type',
             name: 'name',
             category: 'category',
@@ -223,6 +258,77 @@ export class ResourcesService {
             throw new NotFoundException('Resource not found');
         }
         return result.rows[0];
+    }
+
+    async costReport(
+        companyId: string,
+        filters: {
+            resourceType?: string;
+            status?: string;
+            employeeId?: string;
+            resourceTemplateId?: string;
+        } = {},
+    ) {
+        const conditions = ['r.company_id = $1', 'r.cost_amount IS NOT NULL'];
+        const values: unknown[] = [companyId];
+        let index = 2;
+        if (filters.resourceType) {
+            conditions.push(`r.resource_type = $${index++}`);
+            values.push(filters.resourceType);
+        }
+        if (filters.status) {
+            conditions.push(`r.status = $${index++}`);
+            values.push(filters.status);
+        }
+        if (filters.employeeId) {
+            conditions.push(`r.assigned_to_employee_id = $${index++}`);
+            values.push(filters.employeeId);
+        }
+        if (filters.resourceTemplateId) {
+            conditions.push(`r.resource_template_id = $${index++}`);
+            values.push(filters.resourceTemplateId);
+        }
+        const where = conditions.join(' AND ');
+        const [total, byTemplate, byEmployee] = await Promise.all([
+            this.postgres.query<{ totalCost: number; resourceCount: number }>(
+                `SELECT COALESCE(SUM(r.cost_amount), 0) AS "totalCost", COUNT(*)::int AS "resourceCount"
+                 FROM resources r WHERE ${where}`,
+                values,
+            ),
+            this.postgres.query(
+                `SELECT r.resource_template_id AS "templateId",
+                        COALESCE(rt.name, r.name) AS "templateName",
+                        COALESCE(SUM(r.cost_amount), 0) AS "totalCost",
+                        COUNT(*)::int AS "resourceCount"
+                 FROM resources r
+                 LEFT JOIN resource_templates rt ON rt.id = r.resource_template_id AND rt.company_id = r.company_id
+                 WHERE ${where}
+                 GROUP BY r.resource_template_id, COALESCE(rt.name, r.name)
+                 ORDER BY "totalCost" DESC, "templateName" ASC`,
+                values,
+            ),
+            this.postgres.query(
+                `SELECT r.assigned_to_employee_id AS "employeeId",
+                        COALESCE(e.name, CASE WHEN r.assignment_type IN ('shared', 'company') THEN 'Shared / Company' ELSE 'Unassigned' END) AS "employeeName",
+                        r.resource_template_id AS "templateId",
+                        COALESCE(rt.name, r.name) AS "templateName",
+                        COALESCE(SUM(r.cost_amount), 0) AS "totalCost",
+                        COUNT(*)::int AS "resourceCount"
+                 FROM resources r
+                 LEFT JOIN employees e ON e.id = r.assigned_to_employee_id AND e.company_id = r.company_id
+                 LEFT JOIN resource_templates rt ON rt.id = r.resource_template_id AND rt.company_id = r.company_id
+                 WHERE ${where}
+                 GROUP BY r.assigned_to_employee_id, e.name, r.assignment_type, r.resource_template_id, COALESCE(rt.name, r.name)
+                 ORDER BY "employeeName" ASC, "totalCost" DESC`,
+                values,
+            ),
+        ]);
+        return {
+            totalCost: total.rows[0]?.totalCost ?? 0,
+            resourceCount: total.rows[0]?.resourceCount ?? 0,
+            byTemplate: byTemplate.rows,
+            byEmployee: byEmployee.rows,
+        };
     }
 
     async reassign(
@@ -327,6 +433,10 @@ export class ResourcesService {
 export class ResourcesController {
     constructor(private service: ResourcesService) { }
 
+    private assertOwner(req: any) {
+        if (req.user.role !== 'owner') throw new ForbiddenException('Only company owners can view resource cost reports');
+    }
+
     @Post()
     create(@Body() data: Resource, @Req() req: any) {
         data.companyId = req.user.companyId;
@@ -348,12 +458,31 @@ export class ResourcesController {
         @Query('status') status?: string,
         @Query('assignedToEmployeeId') assignedToEmployeeId?: string,
         @Query('vendorId') vendorId?: string,
+        @Query('resourceTemplateId') resourceTemplateId?: string,
     ) {
         return this.service.findAll(req.user.companyId, parseLimit(limit), {
             resourceType,
             status,
             assignedToEmployeeId,
             vendorId,
+            resourceTemplateId,
+        });
+    }
+
+    @Get('reports/costs')
+    costReport(
+        @Req() req: any,
+        @Query('resourceType') resourceType?: string,
+        @Query('status') status?: string,
+        @Query('employeeId') employeeId?: string,
+        @Query('resourceTemplateId') resourceTemplateId?: string,
+    ) {
+        this.assertOwner(req);
+        return this.service.costReport(req.user.companyId, {
+            resourceType,
+            status,
+            employeeId,
+            resourceTemplateId,
         });
     }
 

@@ -48,6 +48,52 @@ test('create rejects an invalid category', async () => {
     );
 });
 
+test('create applies active template defaults while allowing resource overrides', async () => {
+    const captured: { sql: string; params: unknown[] }[] = [];
+    const pg = {
+        query: async (sql: string, params: unknown[]) => {
+            captured.push({ sql, params });
+            if (sql.includes('FROM resource_templates')) {
+                return {
+                    rowCount: 1,
+                    rows: [{
+                        name: 'Claude.ai',
+                        category: 'Software & Subscriptions',
+                        resource_type: 'subscription',
+                        vendor_id: 'vendor-1',
+                        default_cost_amount: 25,
+                        default_cost_type: 'recurring',
+                        default_details: { billingInterval: 'monthly' },
+                    }],
+                };
+            }
+            return { rowCount: 1, rows: [makeResourceRow()] };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await service.create({
+        companyId: 'company-1',
+        resourceTemplateId: 'template-1',
+        resourceType: 'subscription',
+        name: '',
+        category: '',
+        costAmount: 30,
+        details: { numberOfSeats: 1 },
+    } as any);
+
+    const insert = captured.find((item) => item.sql.includes('INSERT INTO resources'));
+    assert.ok(insert);
+    assert.equal(insert.params[2], 'template-1');
+    assert.equal(insert.params[5], 'Claude.ai');
+    assert.equal(insert.params[6], 'Software & Subscriptions');
+    assert.equal(insert.params[15], 30);
+    assert.deepEqual(JSON.parse(insert.params[21] as string), {
+        billingInterval: 'monthly',
+        numberOfSeats: 1,
+    });
+});
+
 test('findAll builds filtered query for an employee', async () => {
     const captured: { sql: string; params: unknown[] }[] = [];
     const pg = {

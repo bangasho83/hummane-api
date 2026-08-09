@@ -381,13 +381,45 @@ export const ResourceAssignmentTypeEnum = z.enum([
 
 export const ResourceCostTypeEnum = z.enum(['one_time', 'recurring']);
 
+export const ResourceTemplateSchema = z.object({
+    id: z.string().optional(),
+    companyId: z.string().min(1),
+    name: z.string().min(1),
+    resourceType: ResourceTypeEnum.default('subscription'),
+    category: z.string().min(1),
+    description: z.string().optional(),
+    vendorId: z.string().uuid().optional().or(z.string().length(0)),
+    defaultCostAmount: TwoDecimalNumberSchema.optional(),
+    defaultCostType: ResourceCostTypeEnum.default('recurring'),
+    defaultDetails: z.record(z.string(), z.any()).optional(),
+    isActive: z.boolean().default(true),
+    createdBy: z.string().uuid().optional().or(z.string().length(0)),
+    createdAt: TimestampSchema.optional(),
+    updatedAt: TimestampSchema.optional(),
+});
+
+export const ResourceTemplateUpdateSchema = ResourceTemplateSchema.pick({
+    name: true,
+    resourceType: true,
+    category: true,
+    description: true,
+    vendorId: true,
+    defaultCostAmount: true,
+    defaultCostType: true,
+    defaultDetails: true,
+    isActive: true,
+}).partial();
+
+export type ResourceTemplate = z.infer<typeof ResourceTemplateSchema>;
+
 export const ResourceSchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
+    resourceTemplateId: z.string().uuid().optional().or(z.string().length(0)),
     vendorId: z.string().uuid().optional().or(z.string().length(0)),
-    resourceType: ResourceTypeEnum,
-    name: z.string().min(1),
-    category: z.string().min(1),
+    resourceType: ResourceTypeEnum.default('subscription'),
+    name: z.string().min(1).default(''),
+    category: z.string().min(1).default(''),
     description: z.string().optional(),
     identifier: z.string().optional(),
     status: ResourceStatusEnum.default('active'),
@@ -406,6 +438,13 @@ export const ResourceSchema = z.object({
     createdBy: z.string().uuid().optional().or(z.string().length(0)),
     createdAt: TimestampSchema.optional(),
     updatedAt: TimestampSchema.optional(),
+}).superRefine((data, context) => {
+    if (!data.resourceTemplateId && !data.name.trim()) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ['name'], message: 'Name is required without a template' });
+    }
+    if (!data.resourceTemplateId && !data.category.trim()) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ['category'], message: 'Category is required without a template' });
+    }
 });
 
 export const ResourceAssignmentPatchSchema = z.object({
