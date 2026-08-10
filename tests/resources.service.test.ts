@@ -120,6 +120,22 @@ test('findAll builds filtered query for an employee', async () => {
     ]);
 });
 
+test('findOne can be scoped to the current employee assignment', async () => {
+    let captured: { sql: string; params: unknown[] } | null = null;
+    const pg = {
+        query: async (sql: string, params: unknown[]) => {
+            captured = { sql, params };
+            return { rowCount: 1, rows: [makeResourceRow()] };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await service.findOne('resource-1', 'company-1', 'employee-1');
+
+    assert.match(captured?.sql || '', /assigned_to_employee_id = \$3/);
+    assert.deepEqual(captured?.params, ['resource-1', 'company-1', 'employee-1']);
+});
+
 test('reassign moves the previous assignment into history', async () => {
     let updateParams: unknown[] = [];
     const client = {

@@ -180,13 +180,16 @@ export class ResourcesService {
         return result.rows;
     }
 
-    async findOne(id: string, companyId: string) {
+    async findOne(id: string, companyId: string, assignedToEmployeeId?: string) {
+        const assignmentClause = assignedToEmployeeId !== undefined
+            ? ' AND assigned_to_employee_id = $3'
+            : '';
         const result = await this.postgres.query<Resource>(
             `SELECT ${this.selectFields}
              FROM resources
-             WHERE id = $1 AND company_id = $2
+             WHERE id = $1 AND company_id = $2${assignmentClause}
              LIMIT 1`,
-            [id, companyId],
+            assignedToEmployeeId !== undefined ? [id, companyId, assignedToEmployeeId] : [id, companyId],
         );
         if (result.rowCount === 0) {
             throw new NotFoundException('Resource not found');
@@ -460,10 +463,12 @@ export class ResourcesController {
         @Query('vendorId') vendorId?: string,
         @Query('resourceTemplateId') resourceTemplateId?: string,
     ) {
+        const employeeScope = req.user.role === 'owner' ? undefined : req.user.employeeId;
+        if (req.user.role !== 'owner' && !employeeScope) return [];
         return this.service.findAll(req.user.companyId, parseLimit(limit), {
             resourceType,
             status,
-            assignedToEmployeeId,
+            assignedToEmployeeId: employeeScope || assignedToEmployeeId,
             vendorId,
             resourceTemplateId,
         });
@@ -488,7 +493,8 @@ export class ResourcesController {
 
     @Get(':id')
     findOne(@Param('id') id: string, @Req() req: any) {
-        return this.service.findOne(id, req.user.companyId);
+        const employeeScope = req.user.role === 'owner' ? undefined : (req.user.employeeId || '');
+        return this.service.findOne(id, req.user.companyId, employeeScope);
     }
 
     @Put(':id')
