@@ -356,6 +356,7 @@ export type Vendor = z.infer<typeof VendorSchema>;
 // Resources (assets, subscriptions, services, expenses, events, reimbursements)
 export const ResourceTypeEnum = z.enum([
     'physical_asset',
+    'book',
     'subscription',
     'service',
     'expense',

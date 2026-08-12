@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ResourcesService } from '../src/resources/resources.module';
+import { ResourceSchema } from '../src/schemas/hr.schema';
 
 function makeResourceRow(overrides: Record<string, any> = {}) {
     return {
@@ -31,6 +32,18 @@ function makeResourceRow(overrides: Record<string, any> = {}) {
         ...overrides,
     };
 }
+
+test('accepts a book resource with book-specific details', () => {
+    const parsed = ResourceSchema.safeParse({
+        companyId: 'company-1',
+        resourceType: 'book',
+        name: 'The Pragmatic Programmer',
+        category: 'Training & Learning',
+        details: { author: 'David Thomas', publicationYear: '1999' },
+    });
+
+    assert.equal(parsed.success, true);
+});
 
 test('create rejects an invalid category', async () => {
     const pg = { query: async () => ({ rowCount: 0, rows: [] }) };
