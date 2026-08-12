@@ -310,6 +310,19 @@ export type FeedbackEntry = z.infer<typeof FeedbackEntrySchema>;
 export type EmployeeDocument = z.infer<typeof EmployeeDocumentSchema>;
 
 // Resource Requests
+export const ResourceRequestTypeSchema = z.enum(['resource', 'headcount', 'team_allocation']);
+
+export const StaffingDetailsSchema = z.object({
+    role: z.string().trim().min(2).max(120).optional(),
+    headcount: z.number().int().min(1).max(100).optional(),
+    skills: z.string().trim().max(1000).optional(),
+    team: z.string().trim().min(2).max(120).optional(),
+    startDate: z.string().date().optional(),
+    employmentType: z.enum(['permanent', 'temporary']).optional(),
+    teamMember: z.string().trim().min(2).max(120).optional(),
+    allocationPercentage: z.number().int().min(1).max(100).optional(),
+});
+
 export const ResourceRequestSchema = z.object({
     id: z.string().optional(),
     companyId: z.string().min(1),
@@ -325,6 +338,8 @@ export const ResourceRequestSchema = z.object({
     reviewerNote: z.string().optional(),
     statusHistory: z.array(z.any()).optional(), // Store as generic jsonb in db
     attachments: DocumentFilesSchema.optional(),
+    requestType: ResourceRequestTypeSchema.default('resource'),
+    staffingDetails: StaffingDetailsSchema.optional(),
     employeeName: z.string().optional(),
     employeeEmail: z.string().optional(),
     createdAt: TimestampSchema.optional(),

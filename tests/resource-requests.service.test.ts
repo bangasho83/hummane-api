@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ResourceRequestsService } from '../src/resources/resource-requests.module';
+import { ResourceRequestSchema } from '../src/schemas/hr.schema';
 
 const existingRequest = {
     id: 'request-1',
@@ -184,4 +185,25 @@ test('notifies admins, owners and the reporting manager when a request is create
         { email: 'admin@example.com', name: 'Admin One' },
         { email: 'manager@example.com', name: 'Manager One' },
     ]);
+});
+
+test('accepts typed staffing request fields', () => {
+    const request = ResourceRequestSchema.parse({
+        companyId: 'company-1',
+        employeeId: 'employee-1',
+        title: 'Add backend capacity',
+        category: 'Staffing',
+        priority: 'high',
+        requestType: 'headcount',
+        staffingDetails: {
+            role: 'Backend Engineer',
+            headcount: 2,
+            team: 'Engineering',
+            startDate: '2026-09-01',
+            employmentType: 'permanent',
+        },
+    });
+
+    assert.equal(request.requestType, 'headcount');
+    assert.equal(request.staffingDetails?.headcount, 2);
 });

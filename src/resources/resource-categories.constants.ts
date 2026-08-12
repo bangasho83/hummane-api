@@ -34,6 +34,10 @@ export const RESOURCE_CATEGORIES = [
         description: 'Online courses, books, certifications, conference tickets, workshop fees',
     },
     {
+        name: 'Staffing',
+        description: 'New headcount and team allocation requests',
+    },
+    {
         name: 'Access & Accounts',
         description: 'VPN access, internal tool accounts, cloud platform seats (AWS, GCP, Azure)',
     },

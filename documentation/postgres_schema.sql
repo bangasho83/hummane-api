@@ -316,6 +316,8 @@ CREATE TABLE IF NOT EXISTS resource_requests (
   estimated_cost numeric(12, 2),
   product_url text,
   attachments jsonb,
+  request_type text NOT NULL DEFAULT 'resource',
+  staffing_details jsonb NOT NULL DEFAULT '{}'::jsonb,
   status text NOT NULL DEFAULT 'pending',
   reviewer_note text,
   status_history jsonb NOT NULL DEFAULT '[]'::jsonb,

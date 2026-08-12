@@ -35,6 +35,8 @@ export class ResourceRequestsService {
 
     async create(companyId: string, employeeId: string, data: ResourceRequest): Promise<ResourceRequest> {
         const created = await this.pg.withTransaction(async (client) => {
+            this.validateStaffingRequest(data);
+
             // Validate category
             const categoryObj = RESOURCE_CATEGORIES.find((c) => c.name === data.category);
             if (!categoryObj) {
@@ -66,8 +68,8 @@ export class ResourceRequestsService {
                 `INSERT INTO resource_requests (
                     company_id, employee_id, title, category, description, 
                     goal_alignment, priority, estimated_cost, product_url, 
-                    attachments, status, status_history, employee_name, employee_email
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    attachments, request_type, staffing_details, status, status_history, employee_name, employee_email
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                 RETURNING *`,
                 [
                     companyId,
@@ -80,6 +82,8 @@ export class ResourceRequestsService {
                     data.estimatedCost || null,
                     data.productUrl || null,
                     data.attachments || null,
+                    data.requestType || 'resource',
+                    data.staffingDetails ? JSON.stringify(data.staffingDetails) : null,
                     'pending',
                     JSON.stringify(statusHistory),
                     empName,
@@ -92,6 +96,7 @@ export class ResourceRequestsService {
                 <ul>
                     <li><strong>Title:</strong> ${data.title}</li>
                     <li><strong>Category:</strong> ${data.category}</li>
+                    <li><strong>Request type:</strong> ${this.formatLabel(data.requestType || 'resource')}</li>
                     <li><strong>Priority:</strong> ${data.priority || 'normal'}</li>
                     ${data.description ? `<li><strong>Description:</strong> ${data.description}</li>` : ''}
                     ${data.goalAlignment ? `<li><strong>Goal Alignment:</strong> ${data.goalAlignment}</li>` : ''}
@@ -169,8 +174,10 @@ export class ResourceRequestsService {
                 estimated_cost = COALESCE($6, estimated_cost),
                 product_url = COALESCE($7, product_url),
                 attachments = COALESCE($8, attachments),
+                request_type = COALESCE($9, request_type),
+                staffing_details = COALESCE($10, staffing_details),
                 updated_at = now()
-            WHERE id = $9 AND company_id = $10 AND employee_id = $11
+            WHERE id = $11 AND company_id = $12 AND employee_id = $13
             RETURNING *`,
             [
                 data.title,
@@ -181,6 +188,8 @@ export class ResourceRequestsService {
                 data.estimatedCost,
                 data.productUrl,
                 data.attachments ? JSON.stringify(data.attachments) : null,
+                data.requestType,
+                data.staffingDetails ? JSON.stringify(data.staffingDetails) : null,
                 id,
                 companyId,
                 employeeId
@@ -332,11 +341,37 @@ export class ResourceRequestsService {
             reviewerNote: row.reviewer_note,
             statusHistory: row.status_history,
             attachments: row.attachments,
+            requestType: row.request_type || 'resource',
+            staffingDetails: row.staffing_details || undefined,
             employeeName: row.employee_name,
             employeeEmail: row.employee_email,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };
+    }
+
+    private validateStaffingRequest(data: ResourceRequest): void {
+        if (data.requestType === 'resource' || !data.requestType) return;
+
+        if (data.category !== 'Staffing') {
+            throw new BadRequestException('Staffing requests must use the Staffing category');
+        }
+
+        const details = data.staffingDetails;
+        if (!details) {
+            throw new BadRequestException('Staffing details are required');
+        }
+
+        if (data.requestType === 'headcount') {
+            if (!details.role || !details.headcount || !details.team || !details.startDate || !details.employmentType) {
+                throw new BadRequestException('Role, headcount, team, start date, and employment type are required');
+            }
+            return;
+        }
+
+        if (!details.teamMember || !details.team || !details.startDate || !details.allocationPercentage) {
+            throw new BadRequestException('Team member, team, start date, and allocation percentage are required');
+        }
     }
 
     private buildStatusUpdateEmail(request: ResourceRequest, previousStatus: string, reviewerNote?: string): string {
