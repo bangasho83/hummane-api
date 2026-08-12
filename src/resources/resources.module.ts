@@ -443,6 +443,13 @@ export class ResourcesController {
     @Post()
     create(@Body() data: Resource, @Req() req: any) {
         data.companyId = req.user.companyId;
+        if (req.user.role !== 'owner' && data.resourceType === 'reimbursement') {
+            if (!req.user.employeeId) throw new ForbiddenException('Employee profile is required for reimbursement submissions');
+            data.assignmentType = 'person';
+            data.assignedToEmployeeId = req.user.employeeId;
+            data.paidByEmployeeId = req.user.employeeId;
+            data.isSettled = false;
+        }
         if (!data.createdBy) {
             data.createdBy = req.user.employeeId;
         }
