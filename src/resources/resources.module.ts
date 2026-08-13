@@ -470,8 +470,9 @@ export class ResourcesController {
         @Query('vendorId') vendorId?: string,
         @Query('resourceTemplateId') resourceTemplateId?: string,
     ) {
-        const employeeScope = req.user.role === 'owner' ? undefined : req.user.employeeId;
-        if (req.user.role !== 'owner' && !employeeScope) return [];
+        const canManageResources = req.user.role === 'owner' || req.user.role === 'admin';
+        const employeeScope = canManageResources ? undefined : req.user.employeeId;
+        if (!canManageResources && !employeeScope) return [];
         return this.service.findAll(req.user.companyId, parseLimit(limit), {
             resourceType,
             status,
@@ -500,7 +501,8 @@ export class ResourcesController {
 
     @Get(':id')
     findOne(@Param('id') id: string, @Req() req: any) {
-        const employeeScope = req.user.role === 'owner' ? undefined : (req.user.employeeId || '');
+        const canManageResources = req.user.role === 'owner' || req.user.role === 'admin';
+        const employeeScope = canManageResources ? undefined : (req.user.employeeId || '');
         return this.service.findOne(id, req.user.companyId, employeeScope);
     }
 

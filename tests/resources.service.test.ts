@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ResourcesService } from '../src/resources/resources.module';
+import { ResourcesController, ResourcesService } from '../src/resources/resources.module';
 import { ResourceSchema } from '../src/schemas/hr.schema';
 
 function makeResourceRow(overrides: Record<string, any> = {}) {
@@ -131,6 +131,58 @@ test('findAll builds filtered query for an employee', async () => {
         'employee-1',
         25,
     ]);
+});
+
+test('admin resource reads preserve an explicit selected employee filter', async () => {
+    let captured: { companyId: string; limit: number; filters: Record<string, unknown> } | null = null;
+    const service = {
+        findAll: async (companyId: string, limit: number, filters: Record<string, unknown>) => {
+            captured = { companyId, limit, filters };
+            return [];
+        },
+    };
+    const controller = new ResourcesController(service as any);
+
+    await controller.findAll(
+        { user: { role: 'admin', companyId: 'company-1', employeeId: 'admin-employee' } },
+        '25',
+        'subscription',
+        undefined,
+        'selected-employee',
+    );
+
+    assert.deepEqual(captured, {
+        companyId: 'company-1',
+        limit: 25,
+        filters: {
+            resourceType: 'subscription',
+            status: undefined,
+            assignedToEmployeeId: 'selected-employee',
+            vendorId: undefined,
+            resourceTemplateId: undefined,
+        },
+    });
+});
+
+test('member resource reads remain scoped to their own employee id', async () => {
+    let captured: { filters: Record<string, unknown> } | null = null;
+    const service = {
+        findAll: async (_companyId: string, _limit: number, filters: Record<string, unknown>) => {
+            captured = { filters };
+            return [];
+        },
+    };
+    const controller = new ResourcesController(service as any);
+
+    await controller.findAll(
+        { user: { role: 'member', companyId: 'company-1', employeeId: 'member-employee' } },
+        undefined,
+        undefined,
+        undefined,
+        'another-employee',
+    );
+
+    assert.equal(captured?.filters.assignedToEmployeeId, 'member-employee');
 });
 
 test('findOne can be scoped to the current employee assignment', async () => {
