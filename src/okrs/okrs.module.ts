@@ -19,6 +19,18 @@ type OkrCycleInput = {
     status?: OkrStatus;
 };
 
+type OkrKeyResultInput = {
+    id?: string;
+    title?: string;
+    description?: string | null;
+    unit?: string;
+    startValue?: number;
+    currentValue?: number;
+    targetValue?: number;
+    dueDate?: string;
+    status?: ObjectiveStatus;
+};
+
 type OkrObjectiveInput = {
     cycleId?: string;
     level?: ObjectiveLevel;
@@ -32,6 +44,7 @@ type OkrObjectiveInput = {
     unit?: string;
     dueDate?: string;
     status?: ObjectiveStatus;
+    keyResults?: OkrKeyResultInput[];
     note?: string;
 };
 
@@ -56,7 +69,7 @@ export class OkrsService {
         'o.parent_objective_id AS "parentObjectiveId"', 'o.department_id AS "departmentId"',
         'o.employee_id AS "employeeId"', 'o.headline', 'o.description',
         'o.current_value AS "currentValue"', 'o.target_value AS "targetValue"', 'o.unit',
-        'o.due_date AS "dueDate"', 'o.status', 'o.progress_history AS "progressHistory"',
+        'o.due_date AS "dueDate"', 'o.status', 'o.key_results AS "keyResults"', 'o.progress_history AS "progressHistory"',
         'o.created_by_user_id AS "createdByUserId"', 'o.updated_by_user_id AS "updatedByUserId"',
         'o.created_at AS "createdAt"', 'o.updated_at AS "updatedAt"',
         'd.name AS "departmentName"', 'e.name AS "employeeName"', 'e.photo_url AS "employeePhotoUrl"',
@@ -71,6 +84,22 @@ export class OkrsService {
         if (typeof value !== 'number' || !Number.isFinite(value) || (!allowZero && value <= 0)) {
             throw new BadRequestException(`${field} must be ${allowZero ? 'a finite number' : 'greater than zero'}`);
         }
+    }
+
+    private normalizeKeyResults(value: unknown): Required<OkrKeyResultInput>[] {
+        if (!Array.isArray(value) || !value.length) throw new BadRequestException('An individual objective requires at least one key result');
+        return value.map((keyResult, index) => {
+            if (!keyResult || typeof keyResult !== 'object') throw new BadRequestException(`Key result ${index + 1} is invalid`);
+            const item = keyResult as OkrKeyResultInput;
+            if (!item.title?.trim()) throw new BadRequestException(`Key result ${index + 1} requires a title`);
+            this.assertNumber(item.startValue ?? 0, `Key result ${index + 1} startValue`);
+            this.assertNumber(item.currentValue, `Key result ${index + 1} currentValue`);
+            this.assertNumber(item.targetValue, `Key result ${index + 1} targetValue`, false);
+            this.assertDate(item.dueDate, `Key result ${index + 1} dueDate`);
+            if (!item.unit?.trim()) throw new BadRequestException(`Key result ${index + 1} requires a unit`);
+            if (item.status && !OBJECTIVE_STATUSES.includes(item.status)) throw new BadRequestException(`Key result ${index + 1} has an invalid status`);
+            return { id: item.id || uuidv4(), title: item.title.trim(), description: item.description ?? null, unit: item.unit.trim(), startValue: item.startValue ?? 0, currentValue: item.currentValue!, targetValue: item.targetValue!, dueDate: item.dueDate!, status: item.status ?? 'upcoming' };
+        });
     }
 
     private async findCycle(id: string, companyId: string) {
@@ -150,22 +179,18 @@ export class OkrsService {
         if (!input.cycleId || !input.level) throw new BadRequestException('cycleId and level are required');
         if (!OBJECTIVE_LEVELS.includes(input.level)) throw new BadRequestException('Invalid objective level');
         const isIndividual = input.level === 'individual';
-        if (isIndividual) {
-            this.assertDate(input.dueDate, 'dueDate');
-            this.assertNumber(input.targetValue, 'targetValue', false);
-            if (input.currentValue !== undefined) this.assertNumber(input.currentValue, 'currentValue');
-            if (input.status && !OBJECTIVE_STATUSES.includes(input.status)) throw new BadRequestException('Invalid objective status');
-        } else if (input.currentValue !== undefined || input.targetValue !== undefined || input.unit !== undefined || input.dueDate !== undefined || input.status !== undefined || input.note !== undefined) {
+        const keyResults = isIndividual ? this.normalizeKeyResults(input.keyResults) : [];
+        if (!isIndividual && (input.currentValue !== undefined || input.targetValue !== undefined || input.unit !== undefined || input.dueDate !== undefined || input.status !== undefined || input.keyResults !== undefined || input.note !== undefined)) {
             throw new BadRequestException('Team objective progress is calculated from its individual objectives');
         }
         if (!await this.findCycle(input.cycleId, user.companyId)) throw new BadRequestException('Cycle does not belong to this company');
         await this.assertObjectiveRelations(input, user.companyId);
         const id = uuidv4();
-        const history = isIndividual && input.note ? [{ recordedAt: new Date().toISOString(), currentValue: input.currentValue ?? 0, status: input.status ?? 'upcoming', note: input.note, updatedByUserId: user.id }] : [];
+        const history = [];
         await this.postgres.query(`INSERT INTO okr_objectives
-            (id, company_id, cycle_id, level, parent_objective_id, department_id, employee_id, headline, description, current_value, target_value, unit, due_date, status, progress_history, created_by_user_id, updated_by_user_id)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$16)`,
-            [id, user.companyId, input.cycleId, input.level, input.parentObjectiveId ?? null, input.departmentId ?? null, input.employeeId ?? null, input.headline ?? '', input.description ?? null, isIndividual ? input.currentValue ?? 0 : null, isIndividual ? input.targetValue : null, isIndividual ? input.unit ?? '' : null, isIndividual ? input.dueDate : null, isIndividual ? input.status ?? 'upcoming' : null, JSON.stringify(history), user.id]);
+            (id, company_id, cycle_id, level, parent_objective_id, department_id, employee_id, headline, description, current_value, target_value, unit, due_date, status, key_results, progress_history, created_by_user_id, updated_by_user_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,NULL,NULL,NULL,NULL,$10::jsonb,$11::jsonb,$12,$12)`,
+            [id, user.companyId, input.cycleId, input.level, input.parentObjectiveId ?? null, input.departmentId ?? null, input.employeeId ?? null, input.headline ?? '', input.description ?? null, JSON.stringify(keyResults), JSON.stringify(history), user.id]);
         return this.findObjective(id, user.companyId);
     }
 
@@ -176,26 +201,18 @@ export class OkrsService {
         if (input.level && input.level !== existing.level) throw new BadRequestException('Objective level cannot be changed');
         const merged = { ...existing, ...definedInput, cycleId: input.cycleId ?? existing.cycleId, level: existing.level } as OkrObjectiveInput;
         const isIndividual = existing.level === 'individual';
-        if (isIndividual) {
-            if (input.dueDate !== undefined) this.assertDate(input.dueDate, 'dueDate');
-            if (input.targetValue !== undefined) this.assertNumber(input.targetValue, 'targetValue', false);
-            if (input.currentValue !== undefined) this.assertNumber(input.currentValue, 'currentValue');
-            if (input.status && !OBJECTIVE_STATUSES.includes(input.status)) throw new BadRequestException('Invalid objective status');
-        } else if (input.currentValue !== undefined || input.targetValue !== undefined || input.unit !== undefined || input.dueDate !== undefined || input.status !== undefined || input.note !== undefined) {
+        const keyResults = input.keyResults === undefined ? undefined : this.normalizeKeyResults(input.keyResults);
+        if (!isIndividual && (input.currentValue !== undefined || input.targetValue !== undefined || input.unit !== undefined || input.dueDate !== undefined || input.status !== undefined || input.keyResults !== undefined || input.note !== undefined)) {
             throw new BadRequestException('Team objective progress is calculated from its individual objectives');
         }
         await this.assertObjectiveRelations(merged, user.companyId);
         const values: unknown[] = [];
         const changes: string[] = [];
-        const columns: Record<string, string> = { cycleId: 'cycle_id', level: 'level', parentObjectiveId: 'parent_objective_id', departmentId: 'department_id', employeeId: 'employee_id', headline: 'headline', description: 'description', currentValue: 'current_value', targetValue: 'target_value', unit: 'unit', dueDate: 'due_date', status: 'status' };
+        const columns: Record<string, string> = { cycleId: 'cycle_id', parentObjectiveId: 'parent_objective_id', departmentId: 'department_id', employeeId: 'employee_id', headline: 'headline', description: 'description' };
         Object.entries(columns).forEach(([key, column]) => {
             if (Object.prototype.hasOwnProperty.call(input, key)) { values.push(input[key as keyof OkrObjectiveInput]); changes.push(`${column} = $${values.length}`); }
         });
-        if (isIndividual && (input.note !== undefined || input.currentValue !== undefined || input.status !== undefined)) {
-            const previousHistory = Array.isArray(existing.progressHistory) ? existing.progressHistory : [];
-            previousHistory.push({ recordedAt: new Date().toISOString(), currentValue: input.currentValue ?? existing.currentValue, status: input.status ?? existing.status, note: input.note ?? null, updatedByUserId: user.id });
-            values.push(JSON.stringify(previousHistory)); changes.push(`progress_history = $${values.length}::jsonb`);
-        }
+        if (keyResults !== undefined) { values.push(JSON.stringify(keyResults)); changes.push(`key_results = $${values.length}::jsonb`); }
         if (!changes.length) return existing;
         values.push(user.id, id, user.companyId);
         await this.postgres.query(`UPDATE okr_objectives SET ${changes.join(', ')}, updated_by_user_id = $${values.length - 2}, updated_at = now()
@@ -208,6 +225,8 @@ export class OkrsService {
     }
 
     private progress(objective: any) {
+        const keyResults = Array.isArray(objective.keyResults) ? objective.keyResults : [];
+        if (keyResults.length) return Math.round(keyResults.reduce((total: number, keyResult: any) => total + (Number(keyResult.targetValue) > 0 ? Math.min(100, Math.max(0, (Number(keyResult.currentValue) / Number(keyResult.targetValue)) * 100)) : 0), 0) / keyResults.length);
         return objective.targetValue > 0 ? Math.min(100, Math.max(0, Math.round((Number(objective.currentValue) / Number(objective.targetValue)) * 100))) : 0;
     }
 
@@ -225,7 +244,7 @@ export class OkrsService {
             LEFT JOIN roles r ON r.id = e.role_id AND r.company_id = e.company_id
             LEFT JOIN users editor ON editor.id = o.updated_by_user_id AND editor.company_id = o.company_id
             WHERE o.company_id = $1 AND o.cycle_id = $2 ORDER BY o.level, o.created_at`, [companyId, cycleId]);
-        const objectives = result.rows.map((row: any) => ({ ...row, currentValue: row.currentValue === null ? null : Number(row.currentValue), targetValue: row.targetValue === null ? null : Number(row.targetValue), progress: row.level === 'individual' ? this.progress(row) : 0, progressHistory: Array.isArray(row.progressHistory) ? row.progressHistory : [] }));
+        const objectives = result.rows.map((row: any) => ({ ...row, currentValue: row.currentValue === null ? null : Number(row.currentValue), targetValue: row.targetValue === null ? null : Number(row.targetValue), keyResults: Array.isArray(row.keyResults) ? row.keyResults : [], progress: row.level === 'individual' ? this.progress(row) : 0, progressHistory: Array.isArray(row.progressHistory) ? row.progressHistory : [] }));
         const individualByParent = new Map<string, any[]>();
         objectives.filter((item: any) => item.level === 'individual').forEach((item: any) => {
             const list = individualByParent.get(item.parentObjectiveId) ?? []; list.push(item); individualByParent.set(item.parentObjectiveId, list);
