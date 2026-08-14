@@ -132,6 +132,7 @@ export class OkrsService {
     private async assertObjectiveRelations(input: OkrObjectiveInput, companyId: string) {
         if (input.level === 'team') {
             if (!input.departmentId) throw new BadRequestException('A team objective requires a departmentId');
+            if (input.employeeId || input.parentObjectiveId) throw new BadRequestException('A team objective cannot have an employee or parent objective');
             const department = await this.postgres.query<DbRow>('SELECT id FROM departments WHERE id = $1 AND company_id = $2', [input.departmentId, companyId]);
             if (!department.rows[0]) throw new BadRequestException('Department does not belong to this company');
         }
@@ -148,18 +149,23 @@ export class OkrsService {
     async createObjective(input: OkrObjectiveInput, user: RequestUser) {
         if (!input.cycleId || !input.level) throw new BadRequestException('cycleId and level are required');
         if (!OBJECTIVE_LEVELS.includes(input.level)) throw new BadRequestException('Invalid objective level');
-        this.assertDate(input.dueDate, 'dueDate');
-        this.assertNumber(input.targetValue, 'targetValue', false);
-        if (input.currentValue !== undefined) this.assertNumber(input.currentValue, 'currentValue');
-        if (input.status && !OBJECTIVE_STATUSES.includes(input.status)) throw new BadRequestException('Invalid objective status');
+        const isIndividual = input.level === 'individual';
+        if (isIndividual) {
+            this.assertDate(input.dueDate, 'dueDate');
+            this.assertNumber(input.targetValue, 'targetValue', false);
+            if (input.currentValue !== undefined) this.assertNumber(input.currentValue, 'currentValue');
+            if (input.status && !OBJECTIVE_STATUSES.includes(input.status)) throw new BadRequestException('Invalid objective status');
+        } else if (input.currentValue !== undefined || input.targetValue !== undefined || input.unit !== undefined || input.dueDate !== undefined || input.status !== undefined || input.note !== undefined) {
+            throw new BadRequestException('Team objective progress is calculated from its individual objectives');
+        }
         if (!await this.findCycle(input.cycleId, user.companyId)) throw new BadRequestException('Cycle does not belong to this company');
         await this.assertObjectiveRelations(input, user.companyId);
         const id = uuidv4();
-        const history = input.note ? [{ recordedAt: new Date().toISOString(), currentValue: input.currentValue ?? 0, status: input.status ?? 'upcoming', note: input.note, updatedByUserId: user.id }] : [];
+        const history = isIndividual && input.note ? [{ recordedAt: new Date().toISOString(), currentValue: input.currentValue ?? 0, status: input.status ?? 'upcoming', note: input.note, updatedByUserId: user.id }] : [];
         await this.postgres.query(`INSERT INTO okr_objectives
             (id, company_id, cycle_id, level, parent_objective_id, department_id, employee_id, headline, description, current_value, target_value, unit, due_date, status, progress_history, created_by_user_id, updated_by_user_id)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$16)`,
-            [id, user.companyId, input.cycleId, input.level, input.parentObjectiveId ?? null, input.departmentId ?? null, input.employeeId ?? null, input.headline ?? '', input.description ?? null, input.currentValue ?? 0, input.targetValue, input.unit ?? '', input.dueDate, input.status ?? 'upcoming', JSON.stringify(history), user.id]);
+            [id, user.companyId, input.cycleId, input.level, input.parentObjectiveId ?? null, input.departmentId ?? null, input.employeeId ?? null, input.headline ?? '', input.description ?? null, isIndividual ? input.currentValue ?? 0 : null, isIndividual ? input.targetValue : null, isIndividual ? input.unit ?? '' : null, isIndividual ? input.dueDate : null, isIndividual ? input.status ?? 'upcoming' : null, JSON.stringify(history), user.id]);
         return this.findObjective(id, user.companyId);
     }
 
@@ -167,20 +173,25 @@ export class OkrsService {
         const existing = await this.findObjective(id, user.companyId);
         if (!existing) throw new NotFoundException('OKR objective not found');
         const definedInput = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as OkrObjectiveInput;
-        const merged = { ...existing, ...definedInput, cycleId: input.cycleId ?? existing.cycleId, level: input.level ?? existing.level } as OkrObjectiveInput;
-        if (input.dueDate !== undefined) this.assertDate(input.dueDate, 'dueDate');
-        if (input.targetValue !== undefined) this.assertNumber(input.targetValue, 'targetValue', false);
-        if (input.currentValue !== undefined) this.assertNumber(input.currentValue, 'currentValue');
-        if (input.status && !OBJECTIVE_STATUSES.includes(input.status)) throw new BadRequestException('Invalid objective status');
-        if (input.level && !OBJECTIVE_LEVELS.includes(input.level)) throw new BadRequestException('Invalid objective level');
-        if (input.level || input.departmentId !== undefined || input.employeeId !== undefined || input.parentObjectiveId !== undefined || input.cycleId !== undefined) await this.assertObjectiveRelations(merged, user.companyId);
+        if (input.level && input.level !== existing.level) throw new BadRequestException('Objective level cannot be changed');
+        const merged = { ...existing, ...definedInput, cycleId: input.cycleId ?? existing.cycleId, level: existing.level } as OkrObjectiveInput;
+        const isIndividual = existing.level === 'individual';
+        if (isIndividual) {
+            if (input.dueDate !== undefined) this.assertDate(input.dueDate, 'dueDate');
+            if (input.targetValue !== undefined) this.assertNumber(input.targetValue, 'targetValue', false);
+            if (input.currentValue !== undefined) this.assertNumber(input.currentValue, 'currentValue');
+            if (input.status && !OBJECTIVE_STATUSES.includes(input.status)) throw new BadRequestException('Invalid objective status');
+        } else if (input.currentValue !== undefined || input.targetValue !== undefined || input.unit !== undefined || input.dueDate !== undefined || input.status !== undefined || input.note !== undefined) {
+            throw new BadRequestException('Team objective progress is calculated from its individual objectives');
+        }
+        await this.assertObjectiveRelations(merged, user.companyId);
         const values: unknown[] = [];
         const changes: string[] = [];
         const columns: Record<string, string> = { cycleId: 'cycle_id', level: 'level', parentObjectiveId: 'parent_objective_id', departmentId: 'department_id', employeeId: 'employee_id', headline: 'headline', description: 'description', currentValue: 'current_value', targetValue: 'target_value', unit: 'unit', dueDate: 'due_date', status: 'status' };
         Object.entries(columns).forEach(([key, column]) => {
             if (Object.prototype.hasOwnProperty.call(input, key)) { values.push(input[key as keyof OkrObjectiveInput]); changes.push(`${column} = $${values.length}`); }
         });
-        if (input.note !== undefined || input.currentValue !== undefined || input.status !== undefined) {
+        if (isIndividual && (input.note !== undefined || input.currentValue !== undefined || input.status !== undefined)) {
             const previousHistory = Array.isArray(existing.progressHistory) ? existing.progressHistory : [];
             previousHistory.push({ recordedAt: new Date().toISOString(), currentValue: input.currentValue ?? existing.currentValue, status: input.status ?? existing.status, note: input.note ?? null, updatedByUserId: user.id });
             values.push(JSON.stringify(previousHistory)); changes.push(`progress_history = $${values.length}::jsonb`);
@@ -200,6 +211,10 @@ export class OkrsService {
         return objective.targetValue > 0 ? Math.min(100, Math.max(0, Math.round((Number(objective.currentValue) / Number(objective.targetValue)) * 100))) : 0;
     }
 
+    private statusForProgress(progress: number): ObjectiveStatus {
+        return progress >= 100 ? 'completed' : progress > 0 ? 'in_progress' : 'upcoming';
+    }
+
     async board(cycleId: string, companyId: string) {
         const cycle = await this.findCycle(cycleId, companyId);
         if (!cycle) throw new NotFoundException('OKR cycle not found');
@@ -210,15 +225,15 @@ export class OkrsService {
             LEFT JOIN roles r ON r.id = e.role_id AND r.company_id = e.company_id
             LEFT JOIN users editor ON editor.id = o.updated_by_user_id AND editor.company_id = o.company_id
             WHERE o.company_id = $1 AND o.cycle_id = $2 ORDER BY o.level, o.created_at`, [companyId, cycleId]);
-        const objectives = result.rows.map((row: any) => ({ ...row, currentValue: Number(row.currentValue), targetValue: Number(row.targetValue), progress: this.progress(row), progressHistory: Array.isArray(row.progressHistory) ? row.progressHistory : [] }));
+        const objectives = result.rows.map((row: any) => ({ ...row, currentValue: row.currentValue === null ? null : Number(row.currentValue), targetValue: row.targetValue === null ? null : Number(row.targetValue), progress: row.level === 'individual' ? this.progress(row) : 0, progressHistory: Array.isArray(row.progressHistory) ? row.progressHistory : [] }));
         const individualByParent = new Map<string, any[]>();
         objectives.filter((item: any) => item.level === 'individual').forEach((item: any) => {
             const list = individualByParent.get(item.parentObjectiveId) ?? []; list.push(item); individualByParent.set(item.parentObjectiveId, list);
         });
         const departments = objectives.filter((item: any) => item.level === 'team').map((team: any) => {
             const individuals = individualByParent.get(team.id) ?? [];
-            const progress = individuals.length ? Math.round(individuals.reduce((total, item) => total + item.progress, 0) / individuals.length) : team.progress;
-            return { id: team.departmentId, name: team.departmentName, teamObjective: { ...team, progress }, individuals };
+            const progress = individuals.length ? Math.round(individuals.reduce((total, item) => total + item.progress, 0) / individuals.length) : 0;
+            return { id: team.departmentId, name: team.departmentName, teamObjective: { ...team, progress, status: this.statusForProgress(progress) }, individuals };
         });
         const companyProgress = departments.length ? Math.round(departments.reduce((total: number, item: any) => total + item.teamObjective.progress, 0) / departments.length) : 0;
         return { cycle: { ...cycle, targetValue: Number(cycle.targetValue), progress: companyProgress }, departments };
