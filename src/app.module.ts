@@ -22,6 +22,7 @@ import { ResourceRequestsModule } from './resources/resource-requests.module';
 import { VendorsModule } from './resources/vendors.module';
 import { ResourceTemplatesModule } from './resources/resource-templates.module';
 import { ResourcesModule } from './resources/resources.module';
+import { OkrsModule } from './okrs/okrs.module';
 
 @Module({
     imports: [
@@ -50,6 +51,7 @@ import { ResourcesModule } from './resources/resources.module';
         VendorsModule,
         ResourceTemplatesModule,
         ResourcesModule,
+        OkrsModule,
     ],
     controllers: [],
     providers: [],
