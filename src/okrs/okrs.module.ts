@@ -166,6 +166,7 @@ export class OkrsService {
             if (!department.rows[0]) throw new BadRequestException('Department does not belong to this company');
         }
         if (input.level === 'individual') {
+            if (input.departmentId !== undefined && input.departmentId !== null) throw new BadRequestException('Individual objectives inherit their department from the employee and team');
             if (!input.employeeId || !input.parentObjectiveId) throw new BadRequestException('An individual objective requires employeeId and parentObjectiveId');
             const employee = await this.postgres.query<DbRow>('SELECT department_id FROM employees WHERE id = $1 AND company_id = $2', [input.employeeId, companyId]);
             if (!employee.rows[0]) throw new BadRequestException('Employee does not belong to this company');
@@ -201,6 +202,7 @@ export class OkrsService {
         if (input.level && input.level !== existing.level) throw new BadRequestException('Objective level cannot be changed');
         const merged = { ...existing, ...definedInput, cycleId: input.cycleId ?? existing.cycleId, level: existing.level } as OkrObjectiveInput;
         const isIndividual = existing.level === 'individual';
+        if (isIndividual && input.departmentId !== undefined && input.departmentId !== null) throw new BadRequestException('Individual objectives inherit their department from the employee and team');
         const keyResults = input.keyResults === undefined ? undefined : this.normalizeKeyResults(input.keyResults);
         if (!isIndividual && (input.currentValue !== undefined || input.targetValue !== undefined || input.unit !== undefined || input.dueDate !== undefined || input.status !== undefined || input.keyResults !== undefined || input.note !== undefined)) {
             throw new BadRequestException('Team objective progress is calculated from its individual objectives');
