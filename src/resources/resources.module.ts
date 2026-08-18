@@ -13,8 +13,12 @@ import {
     UseGuards,
     Injectable,
     BadRequestException,
+    ConflictException,
     ForbiddenException,
+    HttpException,
+    InternalServerErrorException,
     NotFoundException,
+    ServiceUnavailableException,
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthGuard } from '../auth/auth.guard';
@@ -60,7 +64,44 @@ export class ResourcesService {
         'updated_at AS "updatedAt"',
     ].join(', ');
 
+    private throwCreateError(error: unknown): never {
+        if (error instanceof HttpException) throw error;
+
+        const pgError = error as { code?: string; constraint?: string; message?: string };
+
+        if (pgError.code === '23505' && pgError.constraint === 'idx_resources_company_identifier') {
+            throw new ConflictException('This identifier is already in use. Use a different identifier or leave it blank.');
+        }
+
+        if (pgError.code === '23503') {
+            const messages: Record<string, string> = {
+                resources_vendor_fk: 'The selected vendor no longer exists. Refresh the page and select another vendor.',
+                resources_template_fk: 'The selected resource template no longer exists. Refresh the page and select another template.',
+                resources_assigned_employee_fk: 'The selected employee no longer exists. Refresh the page and select another employee.',
+                resources_paid_by_employee_fk: 'The selected employee no longer exists. Refresh the page and select another employee.',
+            };
+            throw new BadRequestException(messages[pgError.constraint ?? ''] ?? 'One of the selected records no longer exists. Refresh the page and try again.');
+        }
+
+        if (
+            (pgError.code === '42703' && pgError.message?.includes('resource_template_id'))
+            || (pgError.code === '42P01' && pgError.message?.includes('resources'))
+        ) {
+            throw new ServiceUnavailableException('Resources are not configured correctly yet. Please contact support.');
+        }
+
+        throw new InternalServerErrorException('We could not save this resource. Please try again, and contact support if the problem continues.');
+    }
+
     async create(data: Resource) {
+        try {
+            return await this.createUnchecked(data);
+        } catch (error) {
+            this.throwCreateError(error);
+        }
+    }
+
+    private async createUnchecked(data: Resource) {
         let template: any = null;
         if (data.resourceTemplateId) {
             const templateResult = await this.postgres.query(

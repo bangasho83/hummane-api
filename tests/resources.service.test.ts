@@ -61,6 +61,67 @@ test('create rejects an invalid category', async () => {
     );
 });
 
+test('create explains a duplicate identifier', async () => {
+    const pg = {
+        query: async () => {
+            throw { code: '23505', constraint: 'idx_resources_company_identifier' };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await assert.rejects(
+        () => service.create({
+            companyId: 'company-1',
+            resourceType: 'subscription',
+            name: 'Figma',
+            category: 'Software & Subscriptions',
+            identifier: 'account@example.com',
+        } as any),
+        /identifier is already in use/i,
+    );
+});
+
+test('create explains stale selected records', async () => {
+    const pg = {
+        query: async () => {
+            throw { code: '23503', constraint: 'resources_assigned_employee_fk' };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await assert.rejects(
+        () => service.create({
+            companyId: 'company-1',
+            resourceType: 'subscription',
+            name: 'Figma',
+            category: 'Software & Subscriptions',
+        } as any),
+        /selected employee no longer exists/i,
+    );
+});
+
+test('create explains missing resource database setup without exposing database details', async () => {
+    const pg = {
+        query: async () => {
+            throw {
+                code: '42703',
+                message: 'column "resource_template_id" of relation "resources" does not exist',
+            };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await assert.rejects(
+        () => service.create({
+            companyId: 'company-1',
+            resourceType: 'subscription',
+            name: 'Figma',
+            category: 'Software & Subscriptions',
+        } as any),
+        /Resources are not configured correctly yet/i,
+    );
+});
+
 test('create applies active template defaults while allowing resource overrides', async () => {
     const captured: { sql: string; params: unknown[] }[] = [];
     const pg = {
