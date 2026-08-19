@@ -168,6 +168,47 @@ test('create applies active template defaults while allowing resource overrides'
     });
 });
 
+test('subscription can be updated after initially leaving renewal date blank', async () => {
+    const captured: { sql: string; params: unknown[] }[] = [];
+    const pg = {
+        query: async (sql: string, params: unknown[]) => {
+            captured.push({ sql, params });
+            return { rowCount: 1, rows: [makeResourceRow({
+                resource_type: 'subscription',
+                details: { numberOfSeats: 1, renewalDate: '2026-07-01' },
+            })] };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await service.update('resource-1', {
+        details: { numberOfSeats: 1, accountEmail: 'owner@example.com', renewalDate: '2026-07-01' },
+    }, 'company-1');
+
+    assert.equal(captured.length, 1);
+    assert.match(captured[0].sql, /UPDATE resources/);
+    assert.deepEqual(JSON.parse(captured[0].params[0] as string), {
+        numberOfSeats: 1,
+        accountEmail: 'owner@example.com',
+        renewalDate: '2026-07-01',
+    });
+    assert.deepEqual(captured[0].params.slice(1), ['resource-1', 'company-1']);
+});
+
+test('update explains a duplicate identifier', async () => {
+    const pg = {
+        query: async () => {
+            throw { code: '23505', constraint: 'idx_resources_company_identifier' };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await assert.rejects(
+        () => service.update('resource-1', { identifier: 'account@example.com' }, 'company-1'),
+        /identifier is already in use/i,
+    );
+});
+
 test('findAll builds filtered query for an employee', async () => {
     const captured: { sql: string; params: unknown[] }[] = [];
     const pg = {

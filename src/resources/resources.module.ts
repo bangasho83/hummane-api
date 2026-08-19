@@ -64,7 +64,7 @@ export class ResourcesService {
         'updated_at AS "updatedAt"',
     ].join(', ');
 
-    private throwCreateError(error: unknown): never {
+    private throwSaveError(error: unknown): never {
         if (error instanceof HttpException) throw error;
 
         const pgError = error as { code?: string; constraint?: string; message?: string };
@@ -97,7 +97,7 @@ export class ResourcesService {
         try {
             return await this.createUnchecked(data);
         } catch (error) {
-            this.throwCreateError(error);
+            this.throwSaveError(error);
         }
     }
 
@@ -239,6 +239,14 @@ export class ResourcesService {
     }
 
     async update(id: string, data: Partial<Resource>, companyId: string) {
+        try {
+            return await this.updateUnchecked(id, data, companyId);
+        } catch (error) {
+            this.throwSaveError(error);
+        }
+    }
+
+    private async updateUnchecked(id: string, data: Partial<Resource>, companyId: string) {
         if (data.category && !RESOURCE_CATEGORIES.find((c) => c.name === data.category)) {
             throw new BadRequestException('Invalid category');
         }
