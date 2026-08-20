@@ -362,16 +362,13 @@ export class ResourcesService {
             this.postgres.query(
                 `SELECT r.assigned_to_employee_id AS "employeeId",
                         COALESCE(e.name, CASE WHEN r.assignment_type IN ('shared', 'company') THEN 'Shared / Company' ELSE 'Unassigned' END) AS "employeeName",
-                        r.resource_template_id AS "templateId",
-                        COALESCE(rt.name, r.name) AS "templateName",
                         COALESCE(SUM(r.cost_amount), 0) AS "totalCost",
                         COUNT(*)::int AS "resourceCount"
                  FROM resources r
                  LEFT JOIN employees e ON e.id = r.assigned_to_employee_id AND e.company_id = r.company_id
-                 LEFT JOIN resource_templates rt ON rt.id = r.resource_template_id AND rt.company_id = r.company_id
                  WHERE ${where}
-                 GROUP BY r.assigned_to_employee_id, e.name, r.assignment_type, r.resource_template_id, COALESCE(rt.name, r.name)
-                 ORDER BY "employeeName" ASC, "totalCost" DESC`,
+                 GROUP BY r.assigned_to_employee_id, e.name, r.assignment_type
+                 ORDER BY "totalCost" DESC, "employeeName" ASC`,
                 values,
             ),
         ]);

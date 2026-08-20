@@ -209,6 +209,25 @@ test('update explains a duplicate identifier', async () => {
     );
 });
 
+test('cost report groups subscription costs by employee rather than by product', async () => {
+    const captured: { sql: string; params: unknown[] }[] = [];
+    const pg = {
+        query: async (sql: string, params: unknown[]) => {
+            captured.push({ sql, params });
+            return { rowCount: 1, rows: [] };
+        },
+    };
+    const service = new ResourcesService(pg as any);
+
+    await service.costReport('company-1', { resourceType: 'subscription', status: 'active' });
+
+    const employeeQuery = captured.find((item) => item.sql.includes('AS "employeeName"'));
+    assert.ok(employeeQuery);
+    assert.match(employeeQuery.sql, /GROUP BY r\.assigned_to_employee_id, e\.name, r\.assignment_type/);
+    assert.doesNotMatch(employeeQuery.sql, /r\.resource_template_id/);
+    assert.doesNotMatch(employeeQuery.sql, /templateName/);
+});
+
 test('findAll builds filtered query for an employee', async () => {
     const captured: { sql: string; params: unknown[] }[] = [];
     const pg = {
