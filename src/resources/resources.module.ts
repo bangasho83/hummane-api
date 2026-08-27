@@ -319,6 +319,10 @@ export class ResourcesService {
             status?: string;
             employeeId?: string;
             resourceTemplateId?: string;
+            vendorId?: string;
+            isSettled?: boolean;
+            month?: string;
+            search?: string;
         } = {},
     ) {
         const conditions = ['r.company_id = $1', 'r.cost_amount IS NOT NULL'];
@@ -340,10 +344,36 @@ export class ResourcesService {
             conditions.push(`r.resource_template_id = $${index++}`);
             values.push(filters.resourceTemplateId);
         }
+        if (filters.vendorId) {
+            conditions.push(`r.vendor_id = $${index++}`);
+            values.push(filters.vendorId);
+        }
+        if (filters.isSettled !== undefined) {
+            conditions.push(`r.is_settled = $${index++}`);
+            values.push(filters.isSettled);
+        }
+        if (filters.month) {
+            if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(filters.month)) {
+                throw new BadRequestException('month must use YYYY-MM format');
+            }
+            const start = `${filters.month}-01`;
+            conditions.push(`COALESCE(r.expense_date, r.created_at) >= $${index++}::date`);
+            values.push(start);
+            conditions.push(`COALESCE(r.expense_date, r.created_at) < ($${index++}::date + INTERVAL '1 month')`);
+            values.push(start);
+        }
+        if (filters.search?.trim()) {
+            conditions.push(`(r.name ILIKE $${index} OR r.category ILIKE $${index} OR COALESCE(r.identifier, '') ILIKE $${index} OR r.details::text ILIKE $${index})`);
+            values.push(`%${filters.search.trim()}%`);
+            index++;
+        }
         const where = conditions.join(' AND ');
         const [total, byTemplate, byEmployee] = await Promise.all([
-            this.postgres.query<{ totalCost: number; resourceCount: number }>(
-                `SELECT COALESCE(SUM(r.cost_amount), 0) AS "totalCost", COUNT(*)::int AS "resourceCount"
+            this.postgres.query<{ totalCost: number; resourceCount: number; recurringCost: number; unsettledCost: number }>(
+                `SELECT COALESCE(SUM(r.cost_amount), 0) AS "totalCost",
+                        COUNT(*)::int AS "resourceCount",
+                        COALESCE(SUM(r.cost_amount) FILTER (WHERE r.cost_type = 'recurring'), 0) AS "recurringCost",
+                        COALESCE(SUM(r.cost_amount) FILTER (WHERE r.is_settled = false), 0) AS "unsettledCost"
                  FROM resources r WHERE ${where}`,
                 values,
             ),
@@ -375,6 +405,8 @@ export class ResourcesService {
         return {
             totalCost: total.rows[0]?.totalCost ?? 0,
             resourceCount: total.rows[0]?.resourceCount ?? 0,
+            recurringCost: total.rows[0]?.recurringCost ?? 0,
+            unsettledCost: total.rows[0]?.unsettledCost ?? 0,
             byTemplate: byTemplate.rows,
             byEmployee: byEmployee.rows,
         };
@@ -535,6 +567,10 @@ export class ResourcesController {
         @Query('status') status?: string,
         @Query('employeeId') employeeId?: string,
         @Query('resourceTemplateId') resourceTemplateId?: string,
+        @Query('vendorId') vendorId?: string,
+        @Query('isSettled') isSettled?: string,
+        @Query('month') month?: string,
+        @Query('search') search?: string,
     ) {
         this.assertOwner(req);
         return this.service.costReport(req.user.companyId, {
@@ -542,6 +578,10 @@ export class ResourcesController {
             status,
             employeeId,
             resourceTemplateId,
+            vendorId,
+            isSettled: isSettled === undefined ? undefined : isSettled === 'true',
+            month,
+            search,
         });
     }
 
