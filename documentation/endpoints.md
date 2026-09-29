@@ -688,3 +688,39 @@ curl -X POST "$BASE_URL/public/applicants" \
   }'
 ```
 
+## Tasks API
+All task endpoints require `Authorization: Bearer <token>` and are scoped to the authenticated user's company.
+
+### GET /task-projects
+List projects for the company, including `parentProjectId` for nested projects.
+
+### POST /task-projects
+Create a project. Body: `{ "name": "Website refresh", "description": "...", "color": "#2563eb", "parentProjectId": null }`.
+
+### GET /tasks?scope=my|all&projectId=...&status=...&search=...
+List tasks. The response includes nested subtask summaries and JSONB comments.
+
+### POST /tasks
+Create a task or subtask. For a subtask, include `parentTaskId`.
+
+```json
+{
+  "projectId": "PROJECT_UUID",
+  "parentTaskId": null,
+  "title": "Review homepage copy",
+  "description": "Read the draft and leave useful context.",
+  "priority": "high",
+  "dueDate": "2026-10-02",
+  "labels": ["Content"]
+}
+```
+
+### GET /tasks/:id
+Fetch one task with its subtask summaries and comments.
+
+### PATCH /tasks/:id
+Update status, priority, title, description, assignee, due date, labels, or parent task.
+
+### POST /tasks/:id/comments
+Add a comment. Body: `{ "body": "Useful context" }`.
+
