@@ -118,7 +118,8 @@ export class TasksService {
         if (!parsed.success) throw new BadRequestException(parsed.error.issues);
         const task = await this.getTask(id, companyId);
         if (!task) return null;
-        const comment = { id: uuidv4(), authorId: authorId ?? null, body: parsed.data.body, createdAt: new Date().toISOString() };
+        const author = authorId ? await this.postgres.query<{ name: string }>('SELECT name FROM employees WHERE id = $1 AND company_id = $2', [authorId, companyId]) : { rows: [] as { name: string }[] };
+        const comment = { id: uuidv4(), authorId: authorId ?? null, authorName: author.rows[0]?.name ?? null, body: parsed.data.body, createdAt: new Date().toISOString() };
         const result = await this.postgres.query<{ id: string }>(`UPDATE tasks SET comments = comments || $1::jsonb, updated_at = now() WHERE id = $2 AND company_id = $3 RETURNING id`, [JSON.stringify([comment]), id, companyId]);
         return result.rows[0] ? this.getTask(result.rows[0].id, companyId) : null;
     }
@@ -129,7 +130,12 @@ export class TasksService {
         const result = await this.postgres.query<any>(`SELECT ${taskFields} FROM tasks t LEFT JOIN employees a ON a.id = t.assignee_id LEFT JOIN task_projects p ON p.id = t.project_id WHERE t.company_id = $1 AND t.parent_task_id = ANY($2::uuid[]) ORDER BY t.created_at`, [companyId, ids]);
         const byParent = new Map<string, any[]>();
         for (const child of result.rows) { const list = byParent.get(child.parentTaskId) ?? []; list.push(child); byParent.set(child.parentTaskId, list); }
-        return rows.map(row => ({ ...row, subtasks: (byParent.get(row.id) ?? []).map(child => ({ id: child.id, title: child.title, done: child.status === 'done' })) }));
+        const hydratedRows = rows.map(row => ({ ...row, subtasks: (byParent.get(row.id) ?? []).map(child => ({ id: child.id, title: child.title, done: child.status === 'done' })) }));
+        const authorIds = [...new Set(hydratedRows.flatMap(row => (Array.isArray(row.comments) ? row.comments : []).map((comment: { authorId?: string }) => comment.authorId).filter(Boolean)))];
+        if (!authorIds.length) return hydratedRows;
+        const authors = await this.postgres.query<{ id: string; name: string }>('SELECT id, name FROM employees WHERE company_id = $1 AND id = ANY($2::uuid[])', [companyId, authorIds]);
+        const names = new Map(authors.rows.map(author => [author.id, author.name]));
+        return hydratedRows.map(row => ({ ...row, comments: (Array.isArray(row.comments) ? row.comments : []).map((comment: { authorId?: string; authorName?: string }) => ({ ...comment, authorName: comment.authorName || (comment.authorId ? names.get(comment.authorId) : undefined) || 'Team member' })) }));
     }
 
     private async assertProject(id: string, companyId: string) { const result = await this.postgres.query('SELECT id FROM task_projects WHERE id = $1 AND company_id = $2', [id, companyId]); if (!result.rowCount) throw new BadRequestException('Project not found'); }
