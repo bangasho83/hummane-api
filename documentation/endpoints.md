@@ -724,3 +724,9 @@ Update status, priority, title, description, assignee, due date, labels, or pare
 ### POST /tasks/:id/comments
 Add a comment. Body: `{ "body": "Useful context" }`.
 
+### Project membership
+- `GET /task-projects/:id/members` — list project members
+- `POST /task-projects/:id/members/:employeeId` — add a member
+- `DELETE /task-projects/:id/members/:employeeId` — remove a member
+- `DELETE /task-projects/:id` — archive a project
+
