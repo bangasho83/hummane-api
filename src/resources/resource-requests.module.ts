@@ -113,12 +113,18 @@ export class ResourceRequestsService {
             };
         });
 
-        await this.notifyApprovers(
-            companyId,
-            employeeId,
-            `New resource request from ${created.empName}`,
-            created.emailHtml,
-        );
+        try {
+            await this.notifyApprovers(
+                companyId,
+                employeeId,
+                `New resource request from ${created.empName}`,
+                created.emailHtml,
+            );
+        } catch (error) {
+            // The request has already been committed. A notification outage
+            // must not make a successful request look like a failed submission.
+            console.error('[ResourceRequests] Failed to notify approvers:', error);
+        }
 
         return created.request;
     }
@@ -453,6 +459,9 @@ export class ResourceRequestsController {
 
     @Post()
     async create(@Req() req: any, @Body() data: any) {
+        if (!req.user.employeeId) {
+            throw new BadRequestException('Your account is not linked to an employee profile');
+        }
         const validated = ResourceRequestSchema.parse(data);
         return this.service.create(req.user.companyId, req.user.employeeId, validated);
     }

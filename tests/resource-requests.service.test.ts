@@ -187,6 +187,38 @@ test('notifies admins, owners and the reporting manager when a request is create
     ]);
 });
 
+test('returns the created request when approver notification fails', async () => {
+    const client = {
+        query: async (sql: string) => {
+            if (sql.includes('SELECT name, email FROM employees')) {
+                return { rowCount: 1, rows: [{ name: 'Employee One', email: 'employee@example.com' }] };
+            }
+            if (sql.includes('INSERT INTO resource_requests')) {
+                return { rowCount: 1, rows: [{ ...existingRequest, category: 'Hardware' }] };
+            }
+            throw new Error(`Unexpected transaction query: ${sql}`);
+        },
+    };
+    const pg = {
+        withTransaction: async (callback: (transactionClient: any) => Promise<any>) => callback(client),
+        query: async () => ({ rowCount: 0, rows: [] }),
+    };
+    const emailService = {
+        sendEmail: async () => { throw new Error('SMTP unavailable'); },
+    };
+    const service = new ResourceRequestsService(pg as any, emailService as any);
+
+    const result = await service.create('company-1', 'employee-1', {
+        companyId: 'company-1',
+        employeeId: 'employee-1',
+        title: 'New laptop',
+        category: 'Hardware',
+        priority: 'normal',
+    } as any);
+
+    assert.equal(result.title, '<Laptop> replacement');
+});
+
 test('accepts typed staffing request fields', () => {
     const request = ResourceRequestSchema.parse({
         companyId: 'company-1',
