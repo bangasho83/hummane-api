@@ -40,10 +40,6 @@ All task endpoints require `Authorization: Bearer <JWT>` and are scoped to the a
 - `PATCH /tasks/:id` — update task content, status, priority, assignee, dates, labels, or parent.
 - `POST /tasks/:id/comments` — append a comment with the author's employee name.
 
-## Resource Request Schema Repair
-
-If `POST /resource-requests` returns a 500 on an older database, run `documentation/migrations/2026-10-23_resource_requests_schema_repair.sql` in Supabase. It safely adds the typed request columns used by the API and normalizes existing rows. The API derives company and employee identity exclusively from the JWT; clients must not be trusted to set them.
-
 ## Development
 
 ```bash

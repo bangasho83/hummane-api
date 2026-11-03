@@ -219,21 +219,6 @@ test('returns the created request when approver notification fails', async () =>
     assert.equal(result.title, '<Laptop> replacement');
 });
 
-test('returns an actionable error when the resource request schema is outdated', async () => {
-    const pg = {
-        withTransaction: async () => {
-            const error = Object.assign(new Error('column "request_type" does not exist'), { code: '42703' });
-            throw error;
-        },
-    };
-    const service = new ResourceRequestsService(pg as any, { sendEmail: async () => true } as any);
-
-    await assert.rejects(
-        () => service.create('company-1', 'employee-1', { companyId: 'company-1', employeeId: 'employee-1', title: 'Laptop', category: 'Hardware' } as any),
-        /database migration/i,
-    );
-});
-
 test('accepts typed staffing request fields', () => {
     const request = ResourceRequestSchema.parse({
         companyId: 'company-1',

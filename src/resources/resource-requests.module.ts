@@ -14,9 +14,6 @@ import {
     BadRequestException,
     NotFoundException,
     ForbiddenException,
-    HttpException,
-    InternalServerErrorException,
-    ServiceUnavailableException,
 } from '@nestjs/common';
 import { PostgresService } from '../postgres/postgres.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -37,9 +34,7 @@ export class ResourceRequestsService {
     ) { }
 
     async create(companyId: string, employeeId: string, data: ResourceRequest): Promise<ResourceRequest> {
-        let created: { request: ResourceRequest; empName: string; emailHtml: string };
-        try {
-            created = await this.pg.withTransaction(async (client) => {
+        const created = await this.pg.withTransaction(async (client) => {
             this.validateStaffingRequest(data);
 
             // Validate category
@@ -116,10 +111,7 @@ export class ResourceRequestsService {
                 empName,
                 emailHtml,
             };
-            });
-        } catch (error) {
-            this.throwCreateError(error);
-        }
+        });
 
         try {
             await this.notifyApprovers(
@@ -135,16 +127,6 @@ export class ResourceRequestsService {
         }
 
         return created.request;
-    }
-
-    private throwCreateError(error: unknown): never {
-        if (error instanceof HttpException) throw error;
-        const databaseError = error as { code?: string; message?: string };
-        console.error('[ResourceRequests] Failed to create request:', { code: databaseError.code, message: databaseError.message });
-        if (databaseError.code === '42703' || databaseError.code === '42P01') {
-            throw new ServiceUnavailableException('Resource requests need a database migration. Please run the resource request schema repair migration.');
-        }
-        throw new InternalServerErrorException('We could not save this resource request. Please try again.');
     }
 
     async findAllForCompany(companyId: string): Promise<ResourceRequest[]> {
@@ -480,13 +462,8 @@ export class ResourceRequestsController {
         if (!req.user.employeeId) {
             throw new BadRequestException('Your account is not linked to an employee profile');
         }
-        const parsed = ResourceRequestSchema.safeParse({
-            ...data,
-            companyId: req.user.companyId,
-            employeeId: req.user.employeeId,
-        });
-        if (!parsed.success) throw new BadRequestException(parsed.error.issues);
-        return this.service.create(req.user.companyId, req.user.employeeId, parsed.data);
+        const validated = ResourceRequestSchema.parse(data);
+        return this.service.create(req.user.companyId, req.user.employeeId, validated);
     }
 
     @Get()
