@@ -68,8 +68,8 @@ export class ResourceRequestsService {
                 `INSERT INTO resource_requests (
                     company_id, employee_id, title, category, description, 
                     goal_alignment, priority, estimated_cost, product_url, 
-                    attachments, request_type, staffing_details, status, status_history, employee_name, employee_email
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                    attachments, status, status_history, employee_name, employee_email
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                 RETURNING *`,
                 [
                     companyId,
@@ -82,8 +82,6 @@ export class ResourceRequestsService {
                     data.estimatedCost || null,
                     data.productUrl || null,
                     data.attachments || null,
-                    data.requestType || 'resource',
-                    data.staffingDetails ? JSON.stringify(data.staffingDetails) : null,
                     'pending',
                     JSON.stringify(statusHistory),
                     empName,
@@ -180,10 +178,8 @@ export class ResourceRequestsService {
                 estimated_cost = COALESCE($6, estimated_cost),
                 product_url = COALESCE($7, product_url),
                 attachments = COALESCE($8, attachments),
-                request_type = COALESCE($9, request_type),
-                staffing_details = COALESCE($10, staffing_details),
                 updated_at = now()
-            WHERE id = $11 AND company_id = $12 AND employee_id = $13
+            WHERE id = $9 AND company_id = $10 AND employee_id = $11
             RETURNING *`,
             [
                 data.title,
@@ -194,8 +190,6 @@ export class ResourceRequestsService {
                 data.estimatedCost,
                 data.productUrl,
                 data.attachments ? JSON.stringify(data.attachments) : null,
-                data.requestType,
-                data.staffingDetails ? JSON.stringify(data.staffingDetails) : null,
                 id,
                 companyId,
                 employeeId

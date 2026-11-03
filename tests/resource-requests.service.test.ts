@@ -122,9 +122,10 @@ test('does not send an email when the status did not change', async () => {
     assert.equal(queries.length, 1);
 });
 
-test('notifies admins, owners and the reporting manager when a request is created', async () => {
+test('creates a request with established resource_requests columns and notifies approvers', async () => {
     const sent: any[] = [];
     let emailResolved = false;
+    let insertSql = '';
 
     const client = {
         query: async (sql: string) => {
@@ -132,6 +133,7 @@ test('notifies admins, owners and the reporting manager when a request is create
                 return { rowCount: 1, rows: [{ name: 'Employee One', email: 'employee@example.com' }] };
             }
             if (sql.includes('INSERT INTO resource_requests')) {
+                insertSql = sql;
                 return { rowCount: 1, rows: [{ ...existingRequest, category: 'Hardware' }] };
             }
             throw new Error(`Unexpected transaction query: ${sql}`);
@@ -177,6 +179,7 @@ test('notifies admins, owners and the reporting manager when a request is create
     } as any);
 
     assert.equal(emailResolved, true, 'create must await the notification email');
+    assert.doesNotMatch(insertSql, /request_type|staffing_details/);
     assert.equal(sent.length, 1);
     const [recipients, subject] = sent[0];
     assert.match(subject, /New resource request/);
